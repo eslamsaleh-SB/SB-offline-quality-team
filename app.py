@@ -276,6 +276,8 @@ with st.sidebar:
     with st.expander("📦  Distribution Processes", expanded=True):
         st.button("Automated Match Extraction", key="nav_auto_extraction",
                   use_container_width=True, on_click=go_to, args=("Automated Match Extraction",))
+        st.button("Automated Match Distribution", key="nav_auto_distribution",
+                  use_container_width=True, on_click=go_to, args=("Automated Match Distribution",))
 
 # ── Helper: standalone per-page header ────────────────────────────────────────
 def render_page_header(eyebrow, title, subtitle=""):
@@ -476,3 +478,86 @@ elif page == "Automated Match Extraction":
 | Current Process | ~5 minutes every 8-hour shift |
 """
     )
+
+# ── Page: Automated Match Distribution (Distribution Processes) ───────────────
+elif page == "Automated Match Distribution":
+    render_page_header(
+        "Distribution Process",
+        "Automated Match Distribution Process",
+        "From a communication-heavy workflow to a streamlined, automated system.",
+    )
+
+    st.markdown(
+        "This document explains the transition from a manual, communication-heavy match "
+        "distribution process to a streamlined, automated system utilizing **Google Forms "
+        "and bots**."
+    )
+
+    # -- Side-by-side comparison: old vs new --
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.error("**Previous Manual Process**")
+        st.markdown(
+            """
+- Reviewers contacted the Team Leader via WhatsApp to request a match.
+- Team Leader manually checked the distribution sheet and prioritized matches (Customer > Opponent > Trial > Academy > P1/P2/Other).
+- Manually assigned the appropriate match to the reviewer.
+- **Challenges:** Continuous WhatsApp interruptions, distractions for Team Leaders, and distribution speed relied entirely on TL availability.
+- **Time Consumption:** Up to 5 minutes per request.
+"""
+        )
+
+    with col2:
+        st.success("**Current Automated Process**")
+        st.markdown(
+            """
+- Reviewer submits a request via Google Form using their HR code.
+- The bot reads the HR code, checks the sheet, and auto-assigns based on strict priority logic (Customer > Opponent > Trial > Academy > P1/P2/Other). **Tie-breaker:** First added to the sheet.
+- The match is automatically added to the reviewer's sheet with an exact date/time stamp.
+- The form tracking sheet is automatically updated to confirm distribution.
+- **Time Consumption:** Less than 1 minute with minimal TL involvement.
+"""
+        )
+
+    # -- Exceptions & scenarios (below the columns) --
+    st.warning(
+        "**Excluded Matches (Manual Assignment):** Hypercare matches and high-priority games "
+        "requiring top-tier reviewers are intentionally excluded from the bot and are still "
+        "distributed manually by Team Leaders."
+    )
+    st.info(
+        "**No Match Scenario:** If the distribution sheet is empty, the bot updates the form "
+        "response to indicate no matches are available. The reviewer then contacts the TL for "
+        "alternative tasks."
+    )
+
+    # -- Improvement summary --
+    st.subheader("Key Improvements")
+    st.markdown(
+        """
+- Significant reduction in communication overhead and TL distractions.
+- Faster match assignment and consistent prioritization logic.
+- Automated tracking for distribution history and timestamps.
+"""
+    )
+
+    st.subheader("Time Efficiency Comparison")
+    st.markdown(
+        """
+| Process | Manual Effort |
+| --- | --- |
+| Previous Process | Up to 5 minutes + continuous communication |
+| Current Process | < 1 minute (Zero TL involvement) |
+"""
+    )
+
+    # -- Future improvements (bottom) --
+    with st.expander("🚀  Future Improvements (Next Phase)", expanded=False):
+        st.markdown(
+            """
+- Automating the distribution of Hypercare and high-priority matches using advanced conditions.
+- Automatic task allocation when no standard matches are available.
+- Enhancing assignment logic based on individual reviewer performance and qualification metrics.
+"""
+        )
