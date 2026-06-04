@@ -305,7 +305,7 @@ with st.sidebar:
     st.markdown("""
     <div class="sidebar-brand">
         <span>Internal Docs</span>
-        Offline Quality Team<br>Processes &amp; Documents
+        Offline Quality Team<br>A Review Process
     </div>
     """, unsafe_allow_html=True)
 
