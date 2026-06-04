@@ -228,8 +228,15 @@ SHEET_CSV_URL = (
 )
 
 # Columns to keep (zero-indexed). Maps Google Sheet columns
-# A, B, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, U, V.
-MATCH_PROGRESS_COLUMNS = [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 20]
+# A, B, E, F, G, H, I, J, K, L, Q, R, V.
+MATCH_PROGRESS_COLUMNS = [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 21]
+
+# Which of the KEPT columns to expose as filters, given by their POSITION inside
+# the loaded (filtered) dataframe — not the original sheet index.
+# Order of kept columns -> df position:
+#   A=0, B=1, E=2, F=3, G=4, H=5, I=6, J=7, K=8, L=9, Q=10, R=11, V=12
+# Requested filters: A, V, F, G, H, I
+FILTER_POSITIONS = [0, 12, 3, 4, 5, 6]
 
 
 @st.cache_data(ttl=300)  # cache for 5 minutes
@@ -308,7 +315,7 @@ if page == "Overview":
     </div>
     """, unsafe_allow_html=True)
 
-# ── Page: Match Progress Tracker (live Google Sheet data) ─────────────────────
+# ── Page: Match Progress Tracker (live Google Sheet data + filters) ───────────
 elif page == "Match Progress Tracker":
     render_page_header(
         "Trackers",
@@ -318,7 +325,29 @@ elif page == "Match Progress Tracker":
 
     try:
         df = load_match_progress()
-        st.dataframe(df, use_container_width=True)
+
+        # -- Filters (columns A, V, F, G, H, I) --
+        filtered = df.copy()
+        valid_positions = [p for p in FILTER_POSITIONS if p < len(df.columns)]
+
+        if valid_positions:
+            st.markdown("**Filters**")
+            filter_cols = st.columns(3)
+            for i, pos in enumerate(valid_positions):
+                col_name = df.columns[pos]
+                label = str(col_name) if str(col_name).strip() else f"Column {pos}"
+                # Unique, non-empty values for this column
+                options = sorted(
+                    {str(v) for v in df[col_name].tolist() if str(v).strip() != ""}
+                )
+                with filter_cols[i % 3]:
+                    chosen = st.multiselect(label, options, key=f"filter_{pos}")
+                if chosen:
+                    filtered = filtered[filtered[col_name].astype(str).isin(chosen)]
+
+            st.caption(f"Showing {len(filtered)} of {len(df)} rows.")
+
+        st.dataframe(filtered, use_container_width=True)
     except Exception as e:
         st.error(
             "Could not load the Match Progress data right now. "
