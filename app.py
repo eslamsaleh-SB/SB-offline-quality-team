@@ -29,9 +29,23 @@ html, body, [class*="css"] {
 [data-testid="stSidebar"] {
     background-color: #0e1117;
     border-right: 1px solid #2a2f3a;
+    /* Keep the sidebar permanently fixed, visible, and at a constant width */
+    min-width: 18rem !important;
+    max-width: 18rem !important;
+    width: 18rem !important;
+    transform: none !important;
+    visibility: visible !important;
 }
 [data-testid="stSidebar"] * {
     color: #CBD5E0 !important;
+}
+/* ---- Lock the sidebar open: hide every collapse / hide control ---- */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarHeader"] button,
+button[kind="headerNoPadding"] {
+    display: none !important;
 }
 /* Sidebar title */
 .sidebar-brand {
