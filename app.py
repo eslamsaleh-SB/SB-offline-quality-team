@@ -8,7 +8,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
+# ── Custom CSS (Dark Theme) ───────────────────────────────────────────────────
 st.markdown("""
 <style>
 /* ---- Google Fonts ---- */
@@ -19,14 +19,15 @@ html, body, [class*="css"] {
 }
 /* ---- Hide default Streamlit chrome ---- */
 #MainMenu, footer, header { visibility: hidden; }
-/* ---- App background ---- */
+/* ---- App background (DARK) ---- */
 .stApp {
-    background-color: #F7F6F2;
+    background-color: #0e1117;
+    color: #fafafa;
 }
-/* ---- Sidebar ---- */
+/* ---- Sidebar (GRAY) ---- */
 [data-testid="stSidebar"] {
-    background-color: #1C2B3A;
-    border-right: none;
+    background-color: #262730;
+    border-right: 1px solid #3a3f4b;
 }
 [data-testid="stSidebar"] * {
     color: #CBD5E0 !important;
@@ -59,7 +60,7 @@ html, body, [class*="css"] {
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #4A6580 !important;
+    color: #7C8AA0 !important;
     margin: 1rem 0 0.3rem;
 }
 /* Radio styling overrides */
@@ -96,25 +97,57 @@ html, body, [class*="css"] {
     padding: 2.5rem 3rem 3rem !important;
     max-width: 860px;
 }
+
+/* ---- Light font colors for native Streamlit text ---- */
+/* Headers (st.header / st.subheader / st.title) and markdown text/bullets */
+[data-testid="stHeading"],
+[data-testid="stHeading"] *,
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3,
+[data-testid="stMarkdownContainer"] h4,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li,
+[data-testid="stMarkdownContainer"] blockquote,
+[data-testid="stMarkdownContainer"] strong {
+    color: #fafafa !important;
+}
+/* Blockquote (the "Note") accent */
+[data-testid="stMarkdownContainer"] blockquote {
+    border-left: 3px solid #68A4C4;
+    padding-left: 1rem;
+    color: #cbd5e0 !important;
+}
+/* Keep st.info / st.success / st.warning text DARK on their light boxes so they
+   stay readable and visually distinct (blue vs green vs amber). The extra
+   selectors give these higher specificity than the light-text rules above. */
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"],
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"] li,
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"] strong,
+[data-testid="stAlert"] [data-testid="stMarkdownContainer"] blockquote {
+    color: #1a1d24 !important;
+}
+
 /* Page top bar */
 .page-header {
     margin-bottom: 2.5rem;
     padding-bottom: 1.5rem;
-    border-bottom: 2px solid #E2DDD5;
+    border-bottom: 2px solid #2a2f3a;
 }
 .page-header .eyebrow {
     font-size: 0.68rem;
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #9B8F83;
+    color: #9aa6b5 !important;
     margin-bottom: 0.4rem;
 }
 .page-header h1 {
     font-family: 'DM Serif Display', serif;
     font-size: 2.4rem;
     font-weight: 400;
-    color: #1C2B3A;
+    color: #fafafa !important;
     margin: 0;
     letter-spacing: -0.02em;
     line-height: 1.2;
@@ -122,43 +155,44 @@ html, body, [class*="css"] {
 .page-header .subtitle {
     margin-top: 0.6rem;
     font-size: 0.95rem;
-    color: #6B7B8D;
+    color: #9aa6b5 !important;
     font-weight: 300;
 }
-/* Content card */
+/* Content card (dark) */
 .content-card {
-    background: #FFFFFF;
-    border: 1px solid #E8E4DE;
+    background: #1c1f26;
+    border: 1px solid #2f3540;
     border-radius: 10px;
     padding: 2rem 2.2rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 1px 3px rgba(28,43,58,0.04);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 .content-card h2 {
     font-family: 'DM Serif Display', serif;
     font-size: 1.35rem;
-    color: #1C2B3A;
+    color: #fafafa !important;
     margin: 0 0 0.9rem;
     font-weight: 400;
 }
 .content-card p {
     font-size: 0.925rem;
     line-height: 1.75;
-    color: #4A5568;
+    color: #c8cfda !important;
     margin-bottom: 0.9rem;
 }
 .content-card p:last-child { margin-bottom: 0; }
-/* Info banner */
+/* Info banner (custom HTML breadcrumb / welcome) */
 .info-banner {
-    background: #EBF4FB;
+    background: rgba(104,164,196,0.12);
     border-left: 4px solid #68A4C4;
     border-radius: 0 8px 8px 0;
     padding: 1rem 1.4rem;
     font-size: 0.875rem;
-    color: #2C5F7A;
+    color: #cfe3f0 !important;
     margin-bottom: 1.5rem;
 }
-/* Home cards */
+.info-banner strong { color: #ffffff !important; }
+/* Home cards (dark) */
 .home-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -166,23 +200,23 @@ html, body, [class*="css"] {
     margin-top: 1.5rem;
 }
 .home-card {
-    background: #FFFFFF;
-    border: 1px solid #E8E4DE;
+    background: #1c1f26;
+    border: 1px solid #2f3540;
     border-radius: 10px;
     padding: 1.4rem 1.6rem;
-    box-shadow: 0 1px 3px rgba(28,43,58,0.04);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 .home-card .icon { font-size: 1.5rem; margin-bottom: 0.6rem; }
 .home-card h3 {
     font-family: 'DM Serif Display', serif;
     font-size: 1.05rem;
-    color: #1C2B3A;
+    color: #fafafa !important;
     margin: 0 0 0.4rem;
     font-weight: 400;
 }
 .home-card p {
     font-size: 0.82rem;
-    color: #6B7B8D;
+    color: #9aa6b5 !important;
     margin: 0;
     line-height: 1.5;
 }
