@@ -216,12 +216,9 @@ nav_structure = {
 }
 
 # Page content definitions: page name -> list of (heading, [paragraphs])
+# NOTE: "A Review" is rendered with native Streamlit components in the router
+# below (not from this dict), so it is intentionally not listed here.
 PAGE_CONTENT = {
-    "A Review": [
-        ("A Review", [LOREM, LOREM2]),
-        ("Key Steps", [LOREM3, LOREM]),
-        ("Acceptance Criteria", [LOREM2, LOREM3]),
-    ],
     "B Review": [
         ("B Review", [LOREM, LOREM2]),
         ("Guidelines", [LOREM3]),
@@ -329,6 +326,72 @@ if page == "Overview":
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+# ── Page: A Review (native Streamlit components) ──────────────────────────────
+elif page == "A Review":
+    st.markdown(
+        '<div class="info-banner">🔍 <strong>Section:</strong> Review Process › A Review</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.header("A Review Process")
+
+    st.info(
+        "This process is applied to **100% of the matches** collected during the "
+        "Collection phase. Its primary purpose is to review match facts, ensuring that "
+        "data is delivered to the customer with **zero errors** regarding these specific events."
+    )
+
+    st.subheader("Match Distribution Priority")
+    st.markdown(
+        "Matches are distributed based on priority. **Customer** matches are assigned first, "
+        "followed by **Opponent**, **Trial**, and **Academy** ad hoc games. After that, "
+        "lower-priority matches are handled (P1, P2, and other priority levels)."
+    )
+
+    st.subheader("Events Reviewed")
+    st.markdown("The following events are meticulously reviewed in this process:")
+    st.markdown(
+        """
+- Starting XI (formation, starting players, and bench)
+- Tactical shifts
+- Goals
+- Assists
+- Cards
+- Substitutions
+- Fouls (including offsides)
+- Free kicks
+- Corner kicks and the subsequent event
+- Errors
+- Freeze frame shots
+- Pressures before shots
+- Player on/off
+- Injury stoppages
+"""
+    )
+    st.markdown(
+        "> **Note:** For all the above, the event details, player, location, and "
+        "event extras are reviewed."
+    )
+
+    st.subheader("Freeze Frame Shots (Specific Review)")
+    st.markdown("For freeze frame shots specifically, the following elements are reviewed:")
+    st.markdown(
+        """
+- Shooter
+- Blocker
+- Goalkeeper extras
+- Goal location
+- Player positions in the frame
+- Shot impact
+"""
+    )
+
+    st.subheader("Quality & Performance Tracking")
+    st.success(
+        "All corrections and updates are displayed in a **dashboard** to evaluate each "
+        "collector's performance and generate a **quality score** for each collector per match."
+    )
 
 # ── All other pages (data-driven) ─────────────────────────────────────────────
 elif page in PAGE_CONTENT:
