@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 import streamlit as st
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -119,7 +118,7 @@ button[kind="headerNoPadding"] {
 /* ---- Main content area ---- */
 .block-container {
     padding: 2.5rem 3rem 3rem !important;
-    max-width: 1100px;
+    max-width: 860px;
 }
 
 /* ---- Light font colors for native Streamlit text ---- */
@@ -220,33 +219,6 @@ button[kind="headerNoPadding"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ── Google Sheet data source ──────────────────────────────────────────────────
-# CSV export of the 'Importrange' tab.
-SHEET_CSV_URL = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1LrQa1PBQEykOrCt7CaYBT-BrJvfJaU7pRTdyQgzqUE0/export?format=csv&gid=1474561682"
-)
-
-# Columns to keep (zero-indexed). Maps Google Sheet columns
-# A, B, E, F, G, H, I, J, K, L, Q, R, V.
-MATCH_PROGRESS_COLUMNS = [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 21]
-
-# Which of the KEPT columns to expose as filters, given by their POSITION inside
-# the loaded (filtered) dataframe — not the original sheet index.
-# Order of kept columns -> df position:
-#   A=0, B=1, E=2, F=3, G=4, H=5, I=6, J=7, K=8, L=9, Q=10, R=11, V=12
-# Requested filters: A, V, F, G, H, I
-FILTER_POSITIONS = [0, 12, 3, 4, 5, 6]
-
-
-@st.cache_data(ttl=300)  # cache for 5 minutes
-def load_match_progress():
-    """Load the Match Progress data from the Google Sheet CSV export,
-    keeping only the requested columns and filling blanks with empty strings."""
-    df = pd.read_csv(SHEET_CSV_URL, usecols=MATCH_PROGRESS_COLUMNS)
-    df = df.fillna("")
-    return df
-
 # ── Navigation state ──────────────────────────────────────────────────────────
 if "page" not in st.session_state:
     st.session_state.page = "Overview"
@@ -277,10 +249,6 @@ with st.sidebar:
     # -- Overview (main navigation item) --
     st.button("🏠  Overview", key="nav_overview",
               use_container_width=True, on_click=go_to, args=("Overview",))
-
-    # -- Match Progress Tracker (main navigation item) --
-    st.button("📊  Match Progress Tracker", key="nav_match_progress",
-              use_container_width=True, on_click=go_to, args=("Match Progress Tracker",))
 
     # -- "Review Processes" dropdown containing the A Review page --
     with st.expander("🔍  Review Processes", expanded=True):
@@ -314,46 +282,6 @@ if page == "Overview":
         </p>
     </div>
     """, unsafe_allow_html=True)
-
-# ── Page: Match Progress Tracker (live Google Sheet data + filters) ───────────
-elif page == "Match Progress Tracker":
-    render_page_header(
-        "Trackers",
-        "Match Progress Tracker",
-        "Live data synced from the team Google Sheet (refreshes every 5 minutes).",
-    )
-
-    try:
-        df = load_match_progress()
-
-        # -- Filters (columns A, V, F, G, H, I) --
-        filtered = df.copy()
-        valid_positions = [p for p in FILTER_POSITIONS if p < len(df.columns)]
-
-        if valid_positions:
-            st.markdown("**Filters**")
-            filter_cols = st.columns(3)
-            for i, pos in enumerate(valid_positions):
-                col_name = df.columns[pos]
-                label = str(col_name) if str(col_name).strip() else f"Column {pos}"
-                # Unique, non-empty values for this column
-                options = sorted(
-                    {str(v) for v in df[col_name].tolist() if str(v).strip() != ""}
-                )
-                with filter_cols[i % 3]:
-                    chosen = st.multiselect(label, options, key=f"filter_{pos}")
-                if chosen:
-                    filtered = filtered[filtered[col_name].astype(str).isin(chosen)]
-
-            st.caption(f"Showing {len(filtered)} of {len(df)} rows.")
-
-        st.dataframe(filtered, use_container_width=True)
-    except Exception as e:
-        st.error(
-            "Could not load the Match Progress data right now. "
-            "Please make sure the Google Sheet is shared as 'Anyone with the link' "
-            f"and try again.\n\nDetails: {e}"
-        )
 
 # ── Page: A Review (standalone header + native Streamlit components) ──────────
 elif page == "A Review":
