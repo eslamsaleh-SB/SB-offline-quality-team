@@ -25,7 +25,7 @@ html, body, [class*="css"] {
     background-color: #0e1117;
     color: #fafafa;
 }
-/* ---- Sidebar (now matches the dark main background) ---- */
+/* ---- Sidebar (matches the dark main background) ---- */
 [data-testid="stSidebar"] {
     background-color: #0e1117;
     border-right: 1px solid #2a2f3a;
@@ -100,7 +100,6 @@ html, body, [class*="css"] {
 }
 
 /* ---- Light font colors for native Streamlit text ---- */
-/* Headers (st.header / st.subheader / st.title) and markdown text/bullets */
 [data-testid="stHeading"],
 [data-testid="stHeading"] *,
 [data-testid="stMarkdownContainer"] h1,
@@ -122,8 +121,7 @@ html, body, [class*="css"] {
 
 /* ---- Alert / message boxes (st.info / st.success / st.warning / st.error) ----
    Force PURE WHITE text inside these components so it stays readable against
-   their colored (dark blue / dark green / amber / red) backgrounds. The extra
-   selectors raise specificity above the light-text rules above. */
+   their colored backgrounds. */
 [data-testid="stAlert"],
 [data-testid="stAlert"] *,
 [data-testid="stAlert"] [data-testid="stMarkdownContainer"],
@@ -135,7 +133,7 @@ html, body, [class*="css"] {
     color: #ffffff !important;
 }
 
-/* Page top bar */
+/* Page top bar (per-page header) */
 .page-header {
     margin-bottom: 2.5rem;
     padding-bottom: 1.5rem;
@@ -187,7 +185,7 @@ html, body, [class*="css"] {
     margin-bottom: 0.9rem;
 }
 .content-card p:last-child { margin-bottom: 0; }
-/* Info banner (custom HTML breadcrumb / welcome) */
+/* Info banner (custom HTML welcome) */
 .info-banner {
     background: rgba(104,164,196,0.12);
     border-left: 4px solid #68A4C4;
@@ -255,16 +253,37 @@ nav_structure = {
     "⚙️  Team Settings": ["Contacts", "Escalation Policy"],
 }
 
+# Per-page header: page name -> (eyebrow, title, subtitle)
+# Each page shows its OWN standalone header. There is no global title.
+PAGE_HEADERS = {
+    "Overview": (
+        "Offline Quality Team",
+        "Processes & Documents",
+        "Internal reference hub — use the sidebar to navigate sections.",
+    ),
+    "A Review": (
+        "Review Process",
+        "A Review Process",
+        "Reviewing match facts to deliver data to the customer with zero errors.",
+    ),
+    "B Review": ("Review Process", "B Review Process", ""),
+    "Final Review": ("Review Process", "Final Review", ""),
+    "Templates": ("Documents", "Templates", ""),
+    "Reference Guides": ("Documents", "Reference Guides", ""),
+    "Contacts": ("Team Settings", "Contacts", ""),
+    "Escalation Policy": ("Team Settings", "Escalation Policy", ""),
+}
+
 # Page content definitions: page name -> list of (heading, [paragraphs])
 # NOTE: "A Review" is rendered with native Streamlit components in the router
 # below (not from this dict), so it is intentionally not listed here.
 PAGE_CONTENT = {
     "B Review": [
-        ("B Review", [LOREM, LOREM2]),
+        ("Overview", [LOREM, LOREM2]),
         ("Guidelines", [LOREM3]),
     ],
     "Final Review": [
-        ("Final Review", [LOREM, LOREM3]),
+        ("Overview", [LOREM, LOREM3]),
         ("Sign-off Checklist", [LOREM2]),
     ],
     "Templates": [
@@ -281,17 +300,6 @@ PAGE_CONTENT = {
     ],
 }
 
-# Breadcrumb section labels shown in the info banner per page
-PAGE_BREADCRUMB = {
-    "A Review": "🔍 <strong>Section:</strong> Review Process › A Review",
-    "B Review": "🔍 <strong>Section:</strong> Review Process › B Review",
-    "Final Review": "🔍 <strong>Section:</strong> Review Process › Final Review",
-    "Templates": "📁 <strong>Section:</strong> Documents › Templates",
-    "Reference Guides": "📁 <strong>Section:</strong> Documents › Reference Guides",
-    "Contacts": "⚙️ <strong>Section:</strong> Team Settings › Contacts",
-    "Escalation Policy": "⚙️ <strong>Section:</strong> Team Settings › Escalation Policy",
-}
-
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     # -- Company logo (top of sidebar) --
@@ -305,7 +313,7 @@ with st.sidebar:
     st.markdown("""
     <div class="sidebar-brand">
         <span>Internal Docs</span>
-        Offline Quality Team<br>A Review Process
+        Offline Quality Team<br>Processes &amp; Documents
     </div>
     """, unsafe_allow_html=True)
 
@@ -323,7 +331,23 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-# ── Helper: render a content card ─────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def render_page_header(page):
+    """Render a standalone header (eyebrow + title + optional subtitle) for the
+    given page. Each page gets its own unique header; nothing global is shown."""
+    eyebrow, title, subtitle = PAGE_HEADERS.get(
+        page, ("Offline Quality Team", page, "")
+    )
+    subtitle_html = f'<div class="subtitle">{subtitle}</div>' if subtitle else ""
+    st.markdown(f"""
+    <div class="page-header">
+        <div class="eyebrow">{eyebrow}</div>
+        <h1>{title}</h1>
+        {subtitle_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def placeholder_card(heading, body_paras):
     paras = "".join(f"<p>{p}</p>" for p in body_paras)
     st.markdown(f"""
@@ -336,14 +360,8 @@ def placeholder_card(heading, body_paras):
 # ── Page Router ───────────────────────────────────────────────────────────────
 page = selected_page.strip()
 
-# ── Main header (always shown) ────────────────────────────────────────────────
-st.markdown("""
-<div class="page-header">
-    <div class="eyebrow">Offline Quality Team</div>
-    <h1>Processes &amp; Documents</h1>
-    <div class="subtitle">Internal reference hub — use the sidebar to navigate sections.</div>
-</div>
-""", unsafe_allow_html=True)
+# Each page renders its OWN header here — there is no global page title.
+render_page_header(page)
 
 # ── Page: Home / Overview ─────────────────────────────────────────────────────
 if page == "Overview":
@@ -375,15 +393,8 @@ if page == "Overview":
     </div>
     """, unsafe_allow_html=True)
 
-# ── Page: A Review (native Streamlit components) ──────────────────────────────
+# ── Page: A Review (native Streamlit components, standalone header above) ─────
 elif page == "A Review":
-    st.markdown(
-        '<div class="info-banner">🔍 <strong>Section:</strong> Review Process › A Review</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.header("A Review Process")
-
     st.info(
         "This process is applied to **100% of the matches** collected during the "
         "Collection phase. Its primary purpose is to review match facts, ensuring that "
@@ -441,10 +452,7 @@ elif page == "A Review":
         "collector's performance and generate a **quality score** for each collector per match."
     )
 
-# ── All other pages (data-driven) ─────────────────────────────────────────────
+# ── All other pages (data-driven, standalone header above) ────────────────────
 elif page in PAGE_CONTENT:
-    breadcrumb = PAGE_BREADCRUMB.get(page, "")
-    if breadcrumb:
-        st.markdown(f'<div class="info-banner">{breadcrumb}</div>', unsafe_allow_html=True)
     for heading, paras in PAGE_CONTENT[page]:
         placeholder_card(heading, paras)
