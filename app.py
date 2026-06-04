@@ -250,10 +250,12 @@ with st.sidebar:
     st.button("🏠  Overview", key="nav_overview",
               use_container_width=True, on_click=go_to, args=("Overview",))
 
-    # -- "Review Processes" dropdown containing the A Review page --
+    # -- "Review Processes" dropdown containing the review pages --
     with st.expander("🔍  Review Processes", expanded=True):
         st.button("A Review", key="nav_a_review",
                   use_container_width=True, on_click=go_to, args=("A Review",))
+        st.button("Hypercare Review", key="nav_hypercare_review",
+                  use_container_width=True, on_click=go_to, args=("Hypercare Review",))
 
 # ── Helper: standalone per-page header ────────────────────────────────────────
 def render_page_header(eyebrow, title, subtitle=""):
@@ -346,4 +348,43 @@ elif page == "A Review":
     st.success(
         "All corrections and updates are displayed in a **dashboard** to evaluate each "
         "collector's performance and generate a **quality score** for each collector per match."
+    )
+
+# ── Page: Hypercare Review (standalone header + native Streamlit components) ──
+elif page == "Hypercare Review":
+    render_page_header(
+        "Review Process",
+        "Hypercare Review Process",
+        "Heightened scrutiny for customers requiring additional attention.",
+    )
+
+    st.markdown(
+        "This specialized review type is applied to matches involving customers who have "
+        "previously experienced issues, thereby requiring **additional attention for a "
+        "designated period**. A dynamic list of prioritized teams is strictly maintained and "
+        "updated based on current circumstances."
+    )
+
+    st.subheader("How Teams Are Added")
+    st.markdown(
+        """
+- **Internal Decisions:** Based on quality monitoring and internal team evaluations.
+- **Customer Requests:** Direct requests from the clients to ensure heightened scrutiny.
+"""
+    )
+
+    st.subheader("Review Scope")
+    st.markdown("_Varies based on customer requirements:_")
+    st.markdown(
+        """
+- **Full Match Review:** Reviewing the entire 90-minute match data.
+- **Player-Specific Review:** Auditing all data related to a single, specific player.
+- **Pressure Events Audit:** Reviewing Pressure events to identify, correct, or add missing instances.
+- **Zero-Post-Edit Matches:** Reviewing matches for customers who strictly require zero modifications after the initial collection process is finalized.
+"""
+    )
+
+    st.warning(
+        "**Resource Allocation Note:** Only the most experienced collectors and reviewers are "
+        "assigned to Hypercare matches to guarantee the highest possible data quality and precision."
     )
