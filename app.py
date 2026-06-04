@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import streamlit as st
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -118,7 +119,7 @@ button[kind="headerNoPadding"] {
 /* ---- Main content area ---- */
 .block-container {
     padding: 2.5rem 3rem 3rem !important;
-    max-width: 860px;
+    max-width: 1100px;
 }
 
 /* ---- Light font colors for native Streamlit text ---- */
@@ -219,6 +220,26 @@ button[kind="headerNoPadding"] {
 </style>
 """, unsafe_allow_html=True)
 
+# ── Google Sheet data source ──────────────────────────────────────────────────
+# CSV export of the 'Importrange' tab.
+SHEET_CSV_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1LrQa1PBQEykOrCt7CaYBT-BrJvfJaU7pRTdyQgzqUE0/export?format=csv&gid=1474561682"
+)
+
+# Columns to keep (zero-indexed). Maps Google Sheet columns
+# A, B, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, U, V.
+MATCH_PROGRESS_COLUMNS = [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21]
+
+
+@st.cache_data(ttl=300)  # cache for 5 minutes
+def load_match_progress():
+    """Load the Match Progress data from the Google Sheet CSV export,
+    keeping only the requested columns and filling blanks with empty strings."""
+    df = pd.read_csv(SHEET_CSV_URL, usecols=MATCH_PROGRESS_COLUMNS)
+    df = df.fillna("")
+    return df
+
 # ── Navigation state ──────────────────────────────────────────────────────────
 if "page" not in st.session_state:
     st.session_state.page = "Overview"
@@ -249,6 +270,10 @@ with st.sidebar:
     # -- Overview (main navigation item) --
     st.button("🏠  Overview", key="nav_overview",
               use_container_width=True, on_click=go_to, args=("Overview",))
+
+    # -- Match Progress Tracker (main navigation item) --
+    st.button("📊  Match Progress Tracker", key="nav_match_progress",
+              use_container_width=True, on_click=go_to, args=("Match Progress Tracker",))
 
     # -- "Review Processes" dropdown containing the A Review page --
     with st.expander("🔍  Review Processes", expanded=True):
@@ -282,6 +307,24 @@ if page == "Overview":
         </p>
     </div>
     """, unsafe_allow_html=True)
+
+# ── Page: Match Progress Tracker (live Google Sheet data) ─────────────────────
+elif page == "Match Progress Tracker":
+    render_page_header(
+        "Trackers",
+        "Match Progress Tracker",
+        "Live data synced from the team Google Sheet (refreshes every 5 minutes).",
+    )
+
+    try:
+        df = load_match_progress()
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.error(
+            "Could not load the Match Progress data right now. "
+            "Please make sure the Google Sheet is shared as 'Anyone with the link' "
+            f"and try again.\n\nDetails: {e}"
+        )
 
 # ── Page: A Review (standalone header + native Streamlit components) ──────────
 elif page == "A Review":
