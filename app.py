@@ -100,7 +100,7 @@ button[kind="headerNoPadding"] {
     box-shadow: none !important;
     color: #FFFFFF !important;
 }
-/* ---- Sidebar expander ("Review Processes" dropdown) ---- */
+/* ---- Sidebar expander (dropdown menus) ---- */
 [data-testid="stSidebar"] [data-testid="stExpander"] {
     border: none;
     background: transparent;
@@ -118,7 +118,7 @@ button[kind="headerNoPadding"] {
 /* ---- Main content area ---- */
 .block-container {
     padding: 2.5rem 3rem 3rem !important;
-    max-width: 860px;
+    max-width: 980px;
 }
 
 /* ---- Light font colors for native Streamlit text ---- */
@@ -130,6 +130,8 @@ button[kind="headerNoPadding"] {
 [data-testid="stMarkdownContainer"] h4,
 [data-testid="stMarkdownContainer"] p,
 [data-testid="stMarkdownContainer"] li,
+[data-testid="stMarkdownContainer"] td,
+[data-testid="stMarkdownContainer"] th,
 [data-testid="stMarkdownContainer"] blockquote,
 [data-testid="stMarkdownContainer"] strong {
     color: #fafafa !important;
@@ -139,6 +141,19 @@ button[kind="headerNoPadding"] {
     border-left: 3px solid #68A4C4;
     padding-left: 1rem;
     color: #cbd5e0 !important;
+}
+/* Markdown tables on dark theme */
+[data-testid="stMarkdownContainer"] table {
+    border-collapse: collapse;
+    width: 100%;
+}
+[data-testid="stMarkdownContainer"] th,
+[data-testid="stMarkdownContainer"] td {
+    border: 1px solid #2f3540 !important;
+    padding: 0.55rem 0.9rem !important;
+}
+[data-testid="stMarkdownContainer"] th {
+    background-color: #1c1f26 !important;
 }
 
 /* ---- Alert / message boxes (st.info / st.success / st.warning / st.error) ----
@@ -250,12 +265,17 @@ with st.sidebar:
     st.button("🏠  Overview", key="nav_overview",
               use_container_width=True, on_click=go_to, args=("Overview",))
 
-    # -- "Review Processes" dropdown containing the review pages --
+    # -- "Review Processes" dropdown --
     with st.expander("🔍  Review Processes", expanded=True):
         st.button("A Review", key="nav_a_review",
                   use_container_width=True, on_click=go_to, args=("A Review",))
         st.button("Hypercare Review", key="nav_hypercare_review",
                   use_container_width=True, on_click=go_to, args=("Hypercare Review",))
+
+    # -- "Distribution Processes" dropdown --
+    with st.expander("📦  Distribution Processes", expanded=True):
+        st.button("Automated Match Extraction", key="nav_auto_extraction",
+                  use_container_width=True, on_click=go_to, args=("Automated Match Extraction",))
 
 # ── Helper: standalone per-page header ────────────────────────────────────────
 def render_page_header(eyebrow, title, subtitle=""):
@@ -387,4 +407,72 @@ elif page == "Hypercare Review":
     st.warning(
         "**Resource Allocation Note:** Only the most experienced collectors and reviewers are "
         "assigned to Hypercare matches to guarantee the highest possible data quality and precision."
+    )
+
+# ── Page: Automated Match Extraction (Distribution Processes) ─────────────────
+elif page == "Automated Match Extraction":
+    render_page_header(
+        "Distribution Process",
+        "Automated Match Extraction Process",
+        "From manual tracking to a fully automated bot solution.",
+    )
+
+    st.markdown(
+        "This document explains the evolution of our match distribution workflow, highlighting "
+        "the transition from a manual tracking method to a **fully automated bot solution**."
+    )
+
+    # -- Side-by-side comparison: old vs new --
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.error("**Previous Manual Process**")
+        st.markdown(
+            """
+- Received a Tableau email every 15 minutes with PDF attachments of completed matches.
+- Team Leaders manually opened emails and reviewed PDFs.
+- Extracted Match IDs manually and added them to the tracking sheet.
+- Manually checked for duplicate entries to avoid errors.
+- **Time Consumption:** Required 3–5 minutes every 15 minutes, creating a continuous manual workload throughout the entire shift.
+"""
+        )
+
+    with col2:
+        st.success("**Current Automated Process**")
+        st.markdown(
+            """
+- An automated bot accesses the Tableau email every 15 minutes.
+- Downloads, reads PDFs, and extracts Match IDs automatically.
+- Adds matches directly to the tracking sheet.
+- Automatically handles duplicate checks before adding any match.
+- Records the exact date and timestamp for each added match.
+"""
+        )
+
+    # -- Team Leader responsibility (below the columns) --
+    st.info(
+        "**Current Team Leader Responsibility:** No continuous manual work is required. "
+        "At the end of each shift, the Team Leader only performs a quick **5-minute validation "
+        "check** against Tableau to ensure no completed matches were missed by the bot."
+    )
+
+    # -- Improvement summary (bottom) --
+    st.subheader("Key Improvements")
+    st.markdown(
+        """
+- Significant reduction in manual workload and elimination of repetitive tasks.
+- Reduced risk of duplicate entries.
+- Faster and more consistent match distribution updates.
+- Better tracking through automated timestamps.
+"""
+    )
+
+    st.subheader("Time Efficiency Comparison")
+    st.markdown(
+        """
+| Process | Manual Effort |
+| --- | --- |
+| Previous Process | 3–5 minutes every 15 minutes |
+| Current Process | ~5 minutes every 8-hour shift |
+"""
     )
