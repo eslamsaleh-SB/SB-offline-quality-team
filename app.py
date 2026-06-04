@@ -229,7 +229,7 @@ SHEET_CSV_URL = (
 
 # Columns to keep (zero-indexed). Maps Google Sheet columns
 # A, B, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, U, V.
-MATCH_PROGRESS_COLUMNS = [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21]
+MATCH_PROGRESS_COLUMNS = [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 20]
 
 
 @st.cache_data(ttl=300)  # cache for 5 minutes
