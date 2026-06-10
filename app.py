@@ -237,10 +237,11 @@ button[kind="headerNoPadding"] {
 
 
 # ── Helper: render a Mermaid flowchart (dark theme) ───────────────────────────
-def render_mermaid(code, height=480):
+def render_mermaid(code, height=360):
     """Render a Mermaid diagram inside an embedded component.
     The diagram code is passed to mermaid.render() as a JS string so that
-    HTML tags inside node labels (e.g. <br/>) are preserved correctly."""
+    HTML tags inside node labels (e.g. <br/>) are preserved correctly.
+    Horizontal (left-to-right) charts may scroll sideways on small screens."""
     html = """
 <!DOCTYPE html>
 <html>
@@ -248,8 +249,8 @@ def render_mermaid(code, height=480):
 <meta charset="utf-8" />
 <style>
   body { background: #0e1117; margin: 0; padding: 0; }
-  #chart { display: flex; justify-content: center; }
-  #chart svg { max-width: 100%; height: auto; }
+  #chart { display: flex; justify-content: flex-start; overflow-x: auto; }
+  #chart svg { height: auto; }
   .err { color: #ff8a8a; font-family: monospace; padding: 1rem; }
 </style>
 </head>
@@ -273,9 +274,9 @@ def render_mermaid(code, height=480):
     components.html(html, height=height, scrolling=True)
 
 
-# ── Process flowcharts (high-level, business terms) ───────────────────────────
+# ── Process flowcharts (high-level, business terms, horizontal LR) ────────────
 FLOW_A_REVIEW = """
-flowchart TD
+flowchart LR
     A([Match Collected]) --> B[Distribute by Priority<br/>Customer · Opponent · Trial · Academy · P1/P2]
     B --> C[Review Match Facts & Events]
     C --> D{Errors Found?}
@@ -288,7 +289,7 @@ flowchart TD
 """
 
 FLOW_HYPERCARE = """
-flowchart TD
+flowchart LR
     A([Team Added to Hypercare List]) --> B{How Was It Added?}
     B -- Internal Decision --> C[Quality Monitoring & Team Evaluation]
     B -- Customer Request --> D[Client Requests Heightened Scrutiny]
@@ -306,7 +307,7 @@ flowchart TD
 """
 
 FLOW_EXTRACTION = """
-flowchart TD
+flowchart LR
     A([Tableau Email Every 15 Minutes<br/>with Completed Matches]) --> B[Bot Reads PDF Attachments]
     B --> C[Extract Match IDs Automatically]
     C --> D{Duplicate Entry?}
@@ -319,7 +320,7 @@ flowchart TD
 """
 
 FLOW_DISTRIBUTION = """
-flowchart TD
+flowchart LR
     A([Reviewer Submits Request via Form + HR Code]) --> B[Identify Reviewer]
     B --> C{Reviewer Recognized?}
     C -- No --> X[Inform Reviewer: Not Recognized] --> Z([End])
@@ -428,7 +429,7 @@ elif page == "A Review":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_A_REVIEW, height=470)
+    render_mermaid(FLOW_A_REVIEW, height=300)
 
     st.subheader("Match Distribution Priority")
     st.markdown(
@@ -497,7 +498,7 @@ elif page == "Hypercare Review":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_HYPERCARE, height=560)
+    render_mermaid(FLOW_HYPERCARE, height=360)
 
     st.subheader("How Teams Are Added")
     st.markdown(
@@ -537,7 +538,7 @@ elif page == "Automated Match Extraction":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_EXTRACTION, height=540)
+    render_mermaid(FLOW_EXTRACTION, height=300)
 
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
@@ -609,7 +610,7 @@ elif page == "Automated Match Distribution":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_DISTRIBUTION, height=820)
+    render_mermaid(FLOW_DISTRIBUTION, height=520)
 
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
