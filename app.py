@@ -1,5 +1,6 @@
 import os
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -234,6 +235,111 @@ button[kind="headerNoPadding"] {
 </style>
 """, unsafe_allow_html=True)
 
+
+# ── Helper: render a Mermaid flowchart (dark theme) ───────────────────────────
+def render_mermaid(code, height=480):
+    """Render a Mermaid diagram inside an embedded component.
+    The diagram code is passed to mermaid.render() as a JS string so that
+    HTML tags inside node labels (e.g. <br/>) are preserved correctly."""
+    html = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { background: #0e1117; margin: 0; padding: 0; }
+  #chart { display: flex; justify-content: center; }
+  #chart svg { max-width: 100%; height: auto; }
+  .err { color: #ff8a8a; font-family: monospace; padding: 1rem; }
+</style>
+</head>
+<body>
+  <div id="chart"></div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+    const code = `__MERMAID_CODE__`;
+    const el = document.getElementById('chart');
+    try {
+      const { svg } = await mermaid.render('graphDiv', code);
+      el.innerHTML = svg;
+    } catch (e) {
+      el.innerHTML = '<pre class="err">' + (e && e.message ? e.message : e) + '</pre>';
+    }
+  </script>
+</body>
+</html>
+""".replace("__MERMAID_CODE__", code)
+    components.html(html, height=height, scrolling=True)
+
+
+# ── Process flowcharts (high-level, business terms) ───────────────────────────
+FLOW_A_REVIEW = """
+flowchart TD
+    A([Match Collected]) --> B[Distribute by Priority<br/>Customer · Opponent · Trial · Academy · P1/P2]
+    B --> C[Review Match Facts & Events]
+    C --> D{Errors Found?}
+    D -- Yes --> E[Correct & Update Event Details]
+    D -- No --> F[Confirm Accuracy]
+    E --> G[Log Corrections to Dashboard]
+    F --> G
+    G --> H[Generate Quality Score per Collector]
+    H --> I([Deliver Data with Zero Errors])
+"""
+
+FLOW_HYPERCARE = """
+flowchart TD
+    A([Team Added to Hypercare List]) --> B{How Was It Added?}
+    B -- Internal Decision --> C[Quality Monitoring & Team Evaluation]
+    B -- Customer Request --> D[Client Requests Heightened Scrutiny]
+    C --> E[Assign Most Experienced Reviewers]
+    D --> E
+    E --> F{Review Scope?}
+    F -- Full Match --> G[Review Entire 90 Minutes]
+    F -- Player-Specific --> H[Audit Single Player Data]
+    F -- Pressure Events --> I[Identify · Correct · Add Pressures]
+    F -- Zero-Post-Edit --> J[No Modifications After Collection]
+    G --> K([Deliver Highest-Quality Data])
+    H --> K
+    I --> K
+    J --> K
+"""
+
+FLOW_EXTRACTION = """
+flowchart TD
+    A([Tableau Email Every 15 Minutes<br/>with Completed Matches]) --> B[Bot Reads PDF Attachments]
+    B --> C[Extract Match IDs Automatically]
+    C --> D{Duplicate Entry?}
+    D -- Yes --> E[Skip Match]
+    D -- No --> F[Add Match to Tracking Sheet<br/>with Date & Timestamp]
+    E --> G[End of Shift]
+    F --> G
+    G --> H[Team Leader 5-Minute Validation vs Tableau]
+    H --> I([Tracking Sheet Complete])
+"""
+
+FLOW_DISTRIBUTION = """
+flowchart TD
+    A([Reviewer Submits Request via Form + HR Code]) --> B[Identify Reviewer]
+    B --> C{Reviewer Recognized?}
+    C -- No --> X[Inform Reviewer: Not Recognized] --> Z([End])
+    C -- Yes --> D{Live or Offline Team?}
+    D -- Live --> E[Check Live Shift Time]
+    D -- Offline --> F[Check Offline Shift Time]
+    E --> G{Is it an Early Start?}
+    F --> G
+    G -- Yes --> H[Show Allowed Start Time<br/>No Match Assigned Yet] --> Z
+    G -- No --> I[Find Available Work by Priority<br/>Customer · Opponent · Trial · Academy · Other]
+    I -. Hypercare & High-Priority .-> Q[Assigned Manually by Team Leader]
+    I --> J{Match Available?}
+    J -- No --> K[Inform Reviewer: No Matches<br/>Notify Team Leader] --> Z
+    J -- Yes --> L[Assign First Available Match<br/>Tie-break: Longest Waiting First]
+    L --> M[Record Date & Time<br/>Confirm in Tracking Sheet]
+    M --> N{Requested After Shift Ended?}
+    N -- Yes --> O[Log Delay for Tracking] --> P([Match Distributed])
+    N -- No --> P
+"""
+
 # ── Navigation state ──────────────────────────────────────────────────────────
 if "page" not in st.session_state:
     st.session_state.page = "Overview"
@@ -321,6 +427,9 @@ elif page == "A Review":
         "data is delivered to the customer with **zero errors** regarding these specific events."
     )
 
+    st.subheader("Process Flow")
+    render_mermaid(FLOW_A_REVIEW, height=470)
+
     st.subheader("Match Distribution Priority")
     st.markdown(
         "Matches are distributed based on priority. **Customer** matches are assigned first, "
@@ -387,6 +496,9 @@ elif page == "Hypercare Review":
         "updated based on current circumstances."
     )
 
+    st.subheader("Process Flow")
+    render_mermaid(FLOW_HYPERCARE, height=560)
+
     st.subheader("How Teams Are Added")
     st.markdown(
         """
@@ -423,6 +535,9 @@ elif page == "Automated Match Extraction":
         "This document explains the evolution of our match distribution workflow, highlighting "
         "the transition from a manual tracking method to a **fully automated bot solution**."
     )
+
+    st.subheader("Process Flow")
+    render_mermaid(FLOW_EXTRACTION, height=540)
 
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
@@ -493,6 +608,9 @@ elif page == "Automated Match Distribution":
         "and bots**."
     )
 
+    st.subheader("Process Flow")
+    render_mermaid(FLOW_DISTRIBUTION, height=820)
+
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
 
@@ -552,15 +670,6 @@ elif page == "Automated Match Distribution":
 """
     )
 
-    # -- Future improvements --
-    with st.expander("🚀  Future Improvements (Next Phase)", expanded=False):
-        st.markdown(
-            """
-- Automating the distribution of Hypercare and high-priority matches using advanced conditions.
-- Enhancing assignment logic based on individual reviewer performance and qualification metrics.
-"""
-        )
-
     # -- Code update log + simple, non-technical summary --
     st.subheader("Code Updated — 9 June 2026")
     st.markdown("**Simple Summary**")
@@ -578,5 +687,14 @@ elif page == "Automated Match Distribution":
 6. **If nothing is available anywhere,** the reviewer is told there are no matches to distribute, and the Team Leader is notified so they can provide another task.
 7. **Some matches stay manual.** Hypercare and other high-priority games are deliberately left out of the automatic process and are still assigned by Team Leaders.
 8. **Requests are handled one at a time.** If several people submit at the same moment, the requests line up and are processed in order, so nothing is lost and no match is given to two people.
+"""
+    )
+
+    # -- Future Improvements — kept as the LAST section on the page --
+    st.subheader("Future Improvements (Next Phase)")
+    st.markdown(
+        """
+- Automating the distribution of Hypercare and high-priority matches using advanced conditions.
+- Enhancing assignment logic based on individual reviewer performance and qualification metrics.
 """
     )
