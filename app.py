@@ -266,6 +266,10 @@ with st.sidebar:
     st.button("🏠  Overview", key="nav_overview",
               use_container_width=True, on_click=go_to, args=("Overview",))
 
+    # -- Team Productivity (live dashboard — top-level item) --
+    st.button("📊  Team Productivity", key="nav_team_productivity",
+              use_container_width=True, on_click=go_to, args=("Team Productivity",))
+
     # -- "Review Processes" dropdown --
     with st.expander("🔍  Review Processes", expanded=True):
         st.button("A Review", key="nav_a_review",
@@ -279,11 +283,6 @@ with st.sidebar:
                   use_container_width=True, on_click=go_to, args=("Automated Match Extraction",))
         st.button("Automated Match Distribution", key="nav_auto_distribution",
                   use_container_width=True, on_click=go_to, args=("Automated Match Distribution",))
-
-    # -- "Team Productivity" dropdown --
-    with st.expander("📊  Team Productivity", expanded=True):
-        st.button("Scorecard Gallery", key="nav_scorecard_gallery",
-                  use_container_width=True, on_click=go_to, args=("Scorecard Gallery",))
 
 # ── Helper: standalone per-page header ────────────────────────────────────────
 def render_page_header(eyebrow, title, subtitle=""):
@@ -587,12 +586,12 @@ elif page == "Automated Match Distribution":
 """
     )
 
-# ── Page: Scorecard Gallery (Team Productivity — live dashboard) ──────────────
-elif page == "Scorecard Gallery":
+# ── Page: Team Productivity (live dashboard) ──────────────────────────────────
+elif page == "Team Productivity":
     render_page_header(
+        "Performance",
         "Team Productivity",
-        "Scorecard Gallery",
-        "Live collection performance, pulled directly from the Scorecard tab in Google Sheets.",
+        "Live collection performance, pulled directly from the Scorecard tab in Google Sheets. Auto-refreshes every 5 minutes.",
     )
 
     # The dashboard is a self-contained HTML/CSS/JS component. It fetches the
@@ -607,5 +606,5 @@ elif page == "Scorecard Gallery":
     except FileNotFoundError:
         st.error(
             "Could not find **scorecard_dashboard.html** next to `app.py`. "
-            "Make sure the dashboard file sits in the same folder as the app."
+            "Make sure the dashboard file sits in the same folder as app.py."
         )

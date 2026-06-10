@@ -3,145 +3,137 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Scorecard Gallery View</title>
+<title>Team Productivity</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap');
   :root{
-    color-scheme: light;
-    --indigo:#4f46e5;
-    --indigo-600:#4f46e5;
-    --indigo-500:#6366f1;
-    --indigo-50:#eef2ff;
-    --indigo-100:#e0e7ff;
-    --purple:#7c3aed;
-    --bg:#f6f7fb;
-    --card:#ffffff;
-    --border:#e8eaf0;
-    --border-strong:#d9dce6;
-    --text:#1e2433;
-    --muted:#6b7280;
-    --muted-2:#9aa1ad;
-    --green:#16a34a;
-    --green-bg:#ecfdf5;
-    --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
-    --shadow-md:0 4px 14px rgba(16,24,40,.08);
+    color-scheme: dark;
+    --bg:#0e1117;          /* matches the site background exactly */
+    --card:#161a22;        /* card surface, a touch lighter than bg */
+    --card-2:#1b2029;      /* nested surface */
+    --border:#2a2f3a;      /* matches the site's sidebar border */
+    --border-soft:#222732;
+    --text:#fafafa;
+    --muted:#9aa6b5;
+    --muted-2:#6f7a8a;
+    --accent:#68A4C4;      /* the site's accent blue */
+    --accent-2:#8FD0E8;
+    --good:#6FCF97;
+    --good-bg:rgba(111,207,151,.12);
+    --shadow:0 1px 3px rgba(0,0,0,.4);
+    --shadow-md:0 8px 26px rgba(0,0,0,.45);
     --radius:14px;
   }
   *{ box-sizing:border-box; }
-  html,body{ margin:0; padding:0; }
+  html,body{ margin:0; padding:0; background:var(--bg); }
   body{
     font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-    background:var(--bg);
     color:var(--text);
     -webkit-font-smoothing:antialiased;
-    padding:22px;
+    padding:4px 2px 28px;
   }
-  .wrap{ max-width:1180px; margin:0 auto; }
+  .wrap{ max-width:100%; margin:0 auto; }
 
-  /* ---------- Header ---------- */
+  /* ---------- Top KPI bar ---------- */
   .topbar{
-    display:flex; align-items:flex-start; justify-content:space-between;
-    gap:20px; flex-wrap:wrap; margin-bottom:18px;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:18px; flex-wrap:wrap; margin-bottom:20px;
   }
-  .title-block h1{
-    font-size:1.55rem; font-weight:700; margin:0 0 4px; letter-spacing:-.02em;
+  .kpis{ display:flex; gap:30px; align-items:center; flex-wrap:wrap; }
+  .hstat .v{ font-size:1.7rem; font-weight:700; line-height:1; letter-spacing:-.02em; }
+  .hstat .v.accent{ color:var(--accent); }
+  .hstat .v.good{ color:var(--good); }
+  .hstat .l{ font-size:.7rem; text-transform:uppercase; letter-spacing:.09em; color:var(--muted-2); margin-top:7px; font-weight:600; }
+
+  .live-pill{
+    display:inline-flex; align-items:center; gap:8px; font-size:.74rem; font-weight:500;
+    color:var(--muted); background:var(--card); border:1px solid var(--border);
+    padding:7px 12px; border-radius:99px;
   }
-  .title-block .sub{ color:var(--muted); font-size:.9rem; margin:0; }
-  .header-stats{ display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
-  .hstat .v{ font-size:1.45rem; font-weight:700; line-height:1; }
-  .hstat .v.accent{ color:var(--indigo); }
-  .hstat .v.green{ color:var(--green); }
-  .hstat .l{ font-size:.72rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-2); margin-top:6px; font-weight:600; }
+  .live-dot{ width:7px; height:7px; border-radius:99px; background:var(--good); box-shadow:0 0 0 0 rgba(111,207,151,.6); animation:pulse 2.4s infinite; }
+  @keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(111,207,151,.5);} 70%{box-shadow:0 0 0 6px rgba(111,207,151,0);} 100%{box-shadow:0 0 0 0 rgba(111,207,151,0);} }
+
   .add-btn{
-    background:var(--indigo); color:#fff; border:none; cursor:pointer;
-    padding:10px 16px; border-radius:10px; font-size:.86rem; font-weight:600;
-    display:inline-flex; align-items:center; gap:7px; box-shadow:var(--shadow);
-    transition:background .15s ease, transform .05s ease;
+    background:var(--accent); color:#06222e; border:none; cursor:pointer;
+    padding:10px 16px; border-radius:10px; font-size:.85rem; font-weight:700;
+    display:inline-flex; align-items:center; gap:7px; transition:filter .15s ease, transform .05s ease;
   }
-  .add-btn:hover{ background:#4338ca; }
+  .add-btn:hover{ filter:brightness(1.08); }
   .add-btn:active{ transform:translateY(1px); }
 
-  /* ---------- Controls row ---------- */
-  .controls{
-    display:flex; align-items:center; justify-content:space-between;
-    gap:16px; flex-wrap:wrap; margin:6px 0 20px;
-  }
+  /* ---------- Controls ---------- */
+  .controls{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:2px 0 20px; }
   .filter{ display:flex; align-items:center; gap:10px; }
-  .filter label{ font-size:.78rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .filter label{ font-size:.74rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
   .filter select{
-    appearance:none; background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 12px center;
-    border:1px solid var(--border-strong); border-radius:10px; padding:9px 36px 9px 14px;
-    font-size:.88rem; font-weight:600; color:var(--text); cursor:pointer; min-width:190px;
-    font-family:inherit;
+    appearance:none; background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa6b5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 12px center;
+    border:1px solid var(--border); border-radius:10px; padding:9px 36px 9px 14px;
+    font-size:.86rem; font-weight:600; color:var(--text); cursor:pointer; min-width:200px; font-family:inherit;
   }
-  .filter select:focus{ outline:2px solid var(--indigo-100); border-color:var(--indigo-500); }
+  .filter select:focus{ outline:2px solid rgba(104,164,196,.3); border-color:var(--accent); }
 
-  .toggle{ display:inline-flex; background:var(--indigo-50); border:1px solid var(--border); border-radius:11px; padding:4px; gap:4px; }
+  .toggle{ display:inline-flex; background:var(--card); border:1px solid var(--border); border-radius:11px; padding:4px; gap:4px; }
   .toggle button{
     border:none; background:transparent; cursor:pointer; font-family:inherit;
-    padding:8px 16px; border-radius:8px; font-size:.84rem; font-weight:600; color:var(--muted);
-    transition:all .15s ease;
+    padding:8px 16px; border-radius:8px; font-size:.83rem; font-weight:600; color:var(--muted); transition:all .15s ease;
   }
-  .toggle button.active{ background:#fff; color:var(--indigo); box-shadow:var(--shadow); }
+  .toggle button.active{ background:var(--accent); color:#06222e; }
 
   /* ---------- Summary cards ---------- */
-  .summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:22px; }
+  .summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px; }
   @media(max-width:900px){ .summary{ grid-template-columns:repeat(2,1fr); } }
   @media(max-width:540px){ .summary{ grid-template-columns:1fr; } }
-  .scard{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow); }
-  .scard .ico{
-    width:34px; height:34px; border-radius:9px; display:grid; place-items:center;
-    background:var(--indigo-50); color:var(--indigo); margin-bottom:12px;
-  }
+  .scard{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); }
+  .scard .ico{ width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:rgba(104,164,196,.14); color:var(--accent); margin-bottom:12px; }
   .scard .ico svg{ width:18px; height:18px; }
-  .scard .label{ font-size:.78rem; color:var(--muted); font-weight:600; }
-  .scard .value{ font-size:1.6rem; font-weight:700; margin:3px 0 2px; letter-spacing:-.02em; }
-  .scard .note{ font-size:.76rem; color:var(--muted-2); }
-  .bar{ height:7px; border-radius:99px; background:var(--indigo-50); margin-top:11px; overflow:hidden; }
-  .bar > span{ display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--indigo-500),var(--purple)); transition:width .6s ease; }
+  .scard .label{ font-size:.76rem; color:var(--muted); font-weight:600; }
+  .scard .value{ font-size:1.55rem; font-weight:700; margin:4px 0 2px; letter-spacing:-.02em; }
+  .scard .note{ font-size:.75rem; color:var(--muted-2); }
+  .bar{ height:7px; border-radius:99px; background:var(--card-2); margin-top:12px; overflow:hidden; border:1px solid var(--border-soft); }
+  .bar > span{ display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); transition:width .6s ease; }
 
   /* ---------- Month grid ---------- */
-  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
   @media(max-width:980px){ .grid{ grid-template-columns:repeat(2,1fr); } }
   @media(max-width:640px){ .grid{ grid-template-columns:1fr; } }
-
-  .mcard{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; }
-  .mcard:hover{ box-shadow:var(--shadow-md); }
+  .mcard{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; transition:border-color .15s ease, box-shadow .15s ease; }
+  .mcard:hover{ border-color:var(--accent); box-shadow:var(--shadow-md); }
   .mcard .mhead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
   .mcard .mname{ font-size:1.05rem; font-weight:700; }
   .mcard .mname small{ color:var(--muted-2); font-weight:500; font-size:.72rem; margin-left:4px; }
-  .badge{ font-size:.7rem; font-weight:600; color:var(--indigo); background:var(--indigo-50); border:1px solid var(--indigo-100); padding:4px 9px; border-radius:99px; white-space:nowrap; }
+  .badge{ font-size:.7rem; font-weight:600; color:var(--accent); background:rgba(104,164,196,.12); border:1px solid rgba(104,164,196,.3); padding:4px 9px; border-radius:99px; white-space:nowrap; }
 
   .total-block{ margin-bottom:14px; }
   .total-block .t-val{ font-size:1.7rem; font-weight:700; letter-spacing:-.02em; line-height:1; }
-  .total-block .t-lbl{ font-size:.74rem; color:var(--muted); font-weight:600; margin-top:5px; }
+  .total-block .t-lbl{ font-size:.73rem; color:var(--muted); font-weight:600; margin-top:5px; }
 
-  .section-label{ font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-2); font-weight:700; margin:6px 0 9px; }
+  .section-label{ font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted-2); font-weight:700; margin:6px 0 9px; }
 
   .weeks{ display:flex; align-items:flex-end; gap:7px; height:64px; margin-bottom:4px; }
   .week{ flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; height:100%; justify-content:flex-end; }
-  .week .col{ width:100%; max-width:26px; background:linear-gradient(180deg,var(--indigo-500),var(--indigo)); border-radius:5px 5px 3px 3px; min-height:3px; transition:height .5s ease; position:relative; }
-  .week .col:hover{ background:var(--purple); }
-  .week .wl{ font-size:.64rem; color:var(--muted-2); font-weight:600; }
+  .week .col{ width:100%; max-width:26px; background:linear-gradient(180deg,var(--accent-2),var(--accent)); border-radius:5px 5px 3px 3px; min-height:3px; transition:height .5s ease; position:relative; }
+  .week .col:hover{ filter:brightness(1.15); }
+  .week .wl{ font-size:.63rem; color:var(--muted-2); font-weight:600; }
   .week .col .tip{
     position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
-    background:#111827; color:#fff; font-size:.66rem; padding:3px 7px; border-radius:6px;
+    background:#05080d; color:#fff; font-size:.66rem; padding:3px 7px; border-radius:6px; border:1px solid var(--border);
     white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .12s ease; font-weight:600;
   }
   .week .col:hover .tip{ opacity:1; }
 
-  .contrib{ margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:11px; }
+  .contrib{ margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft); display:flex; flex-direction:column; gap:11px; }
   .crow .cr-top{ display:flex; align-items:center; justify-content:space-between; font-size:.82rem; margin-bottom:5px; }
   .crow .cr-name{ display:flex; align-items:center; gap:7px; font-weight:600; }
   .dot{ width:9px; height:9px; border-radius:99px; flex:none; }
   .crow .cr-vals{ color:var(--muted); font-weight:500; font-size:.78rem; }
   .crow .cr-vals b{ color:var(--text); }
-  .cbar{ height:6px; border-radius:99px; background:#f1f2f6; overflow:hidden; }
+  .cbar{ height:6px; border-radius:99px; background:var(--card-2); overflow:hidden; border:1px solid var(--border-soft); }
   .cbar > span{ display:block; height:100%; border-radius:99px; }
 
   .empty-month{ color:var(--muted-2); font-size:.8rem; font-style:italic; padding:10px 0; }
 
   /* category view */
-  .cat-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+  .cat-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
   @media(max-width:720px){ .cat-grid{ grid-template-columns:1fr; } }
   .catcard{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); }
   .catcard .ch{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
@@ -150,46 +142,41 @@
   .catcard .cmeta{ color:var(--muted); font-size:.85rem; margin:8px 0 14px; }
   .catcard .cmeta b{ color:var(--text); }
   .spark{ display:flex; align-items:flex-end; gap:5px; height:54px; margin-top:14px; }
-  .spark .sb{ flex:1; background:var(--indigo-100); border-radius:4px 4px 2px 2px; min-height:3px; }
+  .spark .sb{ flex:1; border-radius:4px 4px 2px 2px; min-height:3px; }
   .spark-labels{ display:flex; gap:5px; margin-top:6px; }
   .spark-labels span{ flex:1; text-align:center; font-size:.6rem; color:var(--muted-2); font-weight:600; }
 
   /* states */
   .state{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:34px; text-align:center; box-shadow:var(--shadow); }
-  .state h3{ margin:0 0 8px; font-size:1.05rem; }
-  .state p{ color:var(--muted); font-size:.88rem; margin:0 auto; max-width:540px; line-height:1.55; }
-  .state code{ background:#f1f2f6; padding:2px 6px; border-radius:5px; font-size:.82rem; }
-  .spinner{ width:34px; height:34px; border:3px solid var(--indigo-100); border-top-color:var(--indigo); border-radius:50%; margin:0 auto 14px; animation:spin .8s linear infinite; }
+  .state h3{ margin:0 0 8px; font-size:1.05rem; color:var(--text); }
+  .state p{ color:var(--muted); font-size:.88rem; margin:0 auto; max-width:560px; line-height:1.55; }
+  .state code{ background:var(--card-2); border:1px solid var(--border); padding:2px 6px; border-radius:5px; font-size:.82rem; color:var(--accent-2); }
+  .spinner{ width:34px; height:34px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; margin:0 auto 14px; animation:spin .8s linear infinite; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
-  .retry{ margin-top:16px; background:var(--indigo); color:#fff; border:none; padding:9px 16px; border-radius:9px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .retry{ margin-top:16px; background:var(--accent); color:#06222e; border:none; padding:9px 16px; border-radius:9px; font-weight:700; cursor:pointer; font-family:inherit; }
 
   .toast{
     position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
-    background:#111827; color:#fff; padding:12px 18px; border-radius:10px; font-size:.85rem;
-    box-shadow:0 8px 30px rgba(0,0,0,.25); opacity:0; transition:all .25s ease; pointer-events:none; z-index:50; max-width:90%;
+    background:#05080d; color:#fff; padding:12px 18px; border-radius:10px; font-size:.85rem; border:1px solid var(--border);
+    box-shadow:0 8px 30px rgba(0,0,0,.5); opacity:0; transition:all .25s ease; pointer-events:none; z-index:50; max-width:90%;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
-  .updated{ font-size:.72rem; color:var(--muted-2); margin-top:2px; }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <!-- HEADER -->
+  <!-- TOP KPI BAR (the page title is provided by the site's page header) -->
   <div class="topbar">
-    <div class="title-block">
-      <h1>Scorecard Gallery View</h1>
-      <p class="sub">Live collection performance &middot; sourced from the Scorecard tab</p>
-      <div class="updated" id="updated"></div>
-    </div>
-    <div class="header-stats">
-      <div class="hstat"><div class="v green" id="h-progress">—</div><div class="l">Overall Progress</div></div>
+    <div class="kpis">
+      <div class="hstat"><div class="v good" id="h-progress">—</div><div class="l">Overall Progress</div></div>
       <div class="hstat"><div class="v accent" id="h-total">—</div><div class="l">Total Matches</div></div>
-      <button class="add-btn" id="addCat">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add Category
-      </button>
+      <span class="live-pill"><span class="live-dot"></span><span id="updated">Connecting…</span></span>
     </div>
+    <button class="add-btn" id="addCat">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Category
+    </button>
   </div>
 
   <!-- CONTROLS -->
@@ -233,13 +220,17 @@
   var SHEET_ID = "1hHRnpri4jryPKzSR-h_obHCGzEckAd6OwP1ZhwSIiHo";
   var GID = "16842696";
   var SHEET_NAME = "Scorecard";
-  // Tried in order. The /pub URL works once the sheet is "Published to web".
-  var URLS = [
-    "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/pub?gid=" + GID + "&single=true&output=csv",
-    "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(SHEET_NAME)
-  ];
+  var REFRESH_MS = 5 * 60 * 1000;   // auto-refresh every 5 minutes
+  function urls(){
+    var cb = "_cb=" + Date.now();   // cache-buster so refreshes get fresh data
+    return [
+      "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/pub?gid=" + GID + "&single=true&output=csv&" + cb,
+      "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(SHEET_NAME) + "&" + cb
+    ];
+  }
   var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  var CAT_COLORS = ["#6366f1","#7c3aed","#0ea5e9","#f59e0b","#ec4899","#10b981","#ef4444","#8b5cf6"];
+  // Category colours tuned to read well on the dark theme (site accent first).
+  var CAT_COLORS = ["#68A4C4","#B58BD8","#6FCF97","#F2C94C","#EB8C87","#7FB3FF","#E0A458","#9F8BD8"];
 
   var state = { view:"monthly", period:"all", model:null };
 
@@ -256,10 +247,10 @@
 
   function toast(msg){
     var t = el("toast"); t.textContent = msg; t.classList.add("show");
-    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("show"); }, 3200);
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("show"); }, 3600);
   }
 
-  // ---- CSV parser (RFC-4180-ish, handles quoted commas) --------------------
+  // ---- CSV parser (handles quoted commas, e.g. "21,279") -------------------
   function parseCSV(text){
     var rows=[], row=[], field="", inQ=false, i, c;
     for(i=0;i<text.length;i++){
@@ -281,7 +272,6 @@
 
   // ---- Interpret the Scorecard grid into a model ---------------------------
   function buildModel(rows){
-    // Find the row of weekly dates (Week-Beginning row).
     var dateRowIdx = -1, bestCount = 0;
     for(var r=0;r<rows.length;r++){
       var cnt=0;
@@ -290,7 +280,6 @@
     }
     if(dateRowIdx < 0 || bestCount < 2) throw new Error("Could not locate the weekly date row in the Scorecard tab.");
 
-    // Week columns + their dates.
     var weekCols = [], weekDates = [];
     var dr = rows[dateRowIdx];
     for(var ci=0; ci<dr.length; ci++){
@@ -301,27 +290,23 @@
     }
     var weekColSet = {}; weekCols.forEach(function(c){ weekColSet[c]=true; });
 
-    // Category rows: any row (other than the date row) with a name and numeric data.
     var categories = [];
     for(var ri=0; ri<rows.length; ri++){
       if(ri === dateRowIdx) continue;
       var row = rows[ri];
-      // weekly values
       var weekly = weekCols.map(function(c){ return toNum(row[c]); });
       var sum = weekly.reduce(function(a,b){ return a+b; }, 0);
-      // candidate name: prefer column B (the category), then A, then C/D.
-      // Column A can hold a group label like "Collected Matches" — skip it.
+      // prefer column B (the category), then A, then C/D. Column A may hold a group label.
       var nameOrder = [1, 0, 2, 3], name = "";
       for(var ni=0; ni<nameOrder.length; ni++){
         var k = nameOrder[ni];
         if(k >= row.length || weekColSet[k]) continue;
         var cell = String(row[k]||"").trim();
         if(!cell) continue;
-        if(/^[\d.,%\-]+$/.test(cell)) continue;            // looks numeric
-        if(/^(date|target|total|week|wb|year|month|day|collected matches|collected)$/i.test(cell)) continue; // header / group words
+        if(/^[\d.,%\-]+$/.test(cell)) continue;
+        if(/^(date|target|total|week|wb|year|month|day|collected matches|collected)$/i.test(cell)) continue;
         name = cell; break;
       }
-      // target = a numeric cell in cols 0..3 that is not a week column
       var target = 0;
       for(var t=0; t<Math.min(4,row.length); t++){
         if(weekColSet[t]) continue;
@@ -334,27 +319,19 @@
     }
     if(!categories.length) throw new Error("No category rows (e.g. Umbrella / Tornado) found in the Scorecard tab.");
 
-    // Build months from week dates.
-    var monthsMap = {}; // key "YYYY-M" -> month object
-    var order = [];
+    var monthsMap = {}, order = [];
     weekDates.forEach(function(d, wi){
       var key = d.getUTCFullYear() + "-" + d.getUTCMonth();
       if(!monthsMap[key]){
-        monthsMap[key] = {
-          key:key, monthIdx:d.getUTCMonth(), year:d.getUTCFullYear(),
-          name:MONTH_NAMES[d.getUTCMonth()],
-          weeks:[], total:0, perCat:{}
-        };
+        monthsMap[key] = { key:key, monthIdx:d.getUTCMonth(), year:d.getUTCFullYear(),
+          name:MONTH_NAMES[d.getUTCMonth()], weeks:[], total:0, perCat:{} };
         order.push(key);
         categories.forEach(function(cat){ monthsMap[key].perCat[cat.name] = 0; });
       }
-      var m = monthsMap[key];
-      var weekTotal = 0, perCat = {};
+      var m = monthsMap[key], weekTotal = 0, perCat = {};
       categories.forEach(function(cat){
         var v = cat.weekly[wi] || 0;
-        weekTotal += v;
-        perCat[cat.name] = v;
-        m.perCat[cat.name] += v;
+        weekTotal += v; perCat[cat.name] = v; m.perCat[cat.name] += v;
       });
       m.weeks.push({ date:d, total:weekTotal, perCat:perCat });
       m.total += weekTotal;
@@ -365,10 +342,8 @@
     var totalTarget    = categories.reduce(function(a,c){ return a + c.target; }, 0);
 
     return {
-      categories: categories,
-      months: months,
-      totalCollected: totalCollected,
-      totalTarget: totalTarget,
+      categories: categories, months: months,
+      totalCollected: totalCollected, totalTarget: totalTarget,
       overallProgress: totalTarget > 0 ? (totalCollected/totalTarget*100) : 0
     };
   }
@@ -416,11 +391,9 @@
     ];
 
     el("summary").innerHTML = cards.map(function(c){
-      var bar = (c.bar !== undefined)
-        ? '<div class="bar"><span style="width:'+c.bar+'%"></span></div>' : '';
+      var bar = (c.bar !== undefined) ? '<div class="bar"><span style="width:'+c.bar+'%"></span></div>' : '';
       return '<div class="scard"><div class="ico">'+icon(c.ico)+'</div>'+
-             '<div class="label">'+c.label+'</div>'+
-             '<div class="value">'+c.value+'</div>'+
+             '<div class="label">'+c.label+'</div><div class="value">'+c.value+'</div>'+
              '<div class="note">'+c.note+'</div>'+bar+'</div>';
     }).join("");
   }
@@ -431,16 +404,13 @@
     var html = '<div class="grid">';
     months.forEach(function(m){
       var maxWeek = Math.max.apply(null, m.weeks.map(function(w){ return w.total; }).concat([1]));
-      // weekly bars
       var bars = m.weeks.map(function(w){
         var h = maxWeek>0 ? Math.max(3, Math.round(w.total/maxWeek*58)) : 3;
-        var lbl = String(w.date.getUTCDate());
         return '<div class="week"><div class="col" style="height:'+h+'px">'+
                '<span class="tip">'+fmt(w.total)+' · '+m.name.slice(0,3)+' '+w.date.getUTCDate()+'</span></div>'+
-               '<div class="wl">'+lbl+'</div></div>';
+               '<div class="wl">'+w.date.getUTCDate()+'</div></div>';
       }).join("");
 
-      // contributions
       var contrib = cats.map(function(cat, idx){
         var val = m.perCat[cat.name] || 0;
         var pct = m.total>0 ? (val/m.total*100) : 0;
@@ -450,9 +420,7 @@
                '<div class="cbar"><span style="width:'+pct+'%;background:'+colorFor(idx)+'"></span></div></div>';
       }).join("");
 
-      var weeksHtml = m.total>0
-        ? '<div class="weeks">'+bars+'</div>'
-        : '<div class="empty-month">No collections recorded yet.</div>';
+      var weeksHtml = m.total>0 ? '<div class="weeks">'+bars+'</div>' : '<div class="empty-month">No collections recorded yet.</div>';
 
       html += '<div class="mcard">'+
         '<div class="mhead"><div class="mname">'+m.name+' <small>'+m.year+'</small></div>'+
@@ -468,7 +436,6 @@
 
   function renderCategory(model, months){
     var cats = model.categories;
-    // build per-category monthly totals over the scoped months
     var html = '<div class="cat-grid">';
     cats.forEach(function(cat, idx){
       var col = colorFor(idx);
@@ -488,10 +455,9 @@
         '<div class="ch"><div class="cname"><span class="dot" style="background:'+col+'"></span>'+cat.name+'</div>'+
         '<div class="cpct" style="color:'+col+'">'+pctTarget.toFixed(pctTarget>=99.95?0:1)+'%</div></div>'+
         '<div class="cmeta"><b>'+fmt(cat.total)+'</b> of <b>'+fmt(cat.target)+'</b> target &nbsp;·&nbsp; '+pctOfTotal.toFixed(pctOfTotal>0&&pctOfTotal<1?1:0)+'% of all collections</div>'+
-        '<div class="bar"><span style="width:'+Math.min(100,pctTarget)+'%;background:linear-gradient(90deg,'+col+',var(--purple))"></span></div>'+
+        '<div class="bar"><span style="width:'+Math.min(100,pctTarget)+'%;background:linear-gradient(90deg,'+col+',var(--accent-2))"></span></div>'+
         '<div class="section-label" style="margin-top:18px">Monthly Trend &middot; '+fmt(scopedTotal)+' in view</div>'+
-        '<div class="spark">'+spark+'</div>'+
-        '<div class="spark-labels">'+sparkLabels+'</div>'+
+        '<div class="spark">'+spark+'</div><div class="spark-labels">'+sparkLabels+'</div>'+
       '</div>';
     });
     html += '</div>';
@@ -508,33 +474,43 @@
   }
 
   // ---- Data loading --------------------------------------------------------
-  function fetchFirst(urls, i){
+  function fetchFirst(list, i){
     i = i || 0;
-    if(i >= urls.length) return Promise.reject(new Error("all sources failed"));
-    return fetch(urls[i], { credentials:"omit" }).then(function(res){
+    if(i >= list.length) return Promise.reject(new Error("all sources failed"));
+    return fetch(list[i], { credentials:"omit" }).then(function(res){
       if(!res.ok) throw new Error("HTTP " + res.status);
       return res.text();
     }).then(function(txt){
       if(/<!DOCTYPE|<html/i.test(txt.slice(0,200))) throw new Error("not public");
       return txt;
-    }).catch(function(){ return fetchFirst(urls, i+1); });
+    }).catch(function(){ return fetchFirst(list, i+1); });
   }
 
-  function load(){
-    el("content").innerHTML = '<div class="state"><div class="spinner"></div><h3>Loading live data…</h3><p>Fetching the Scorecard tab from Google Sheets.</p></div>';
-    fetchFirst(URLS).then(function(csv){
-      var rows = parseCSV(csv);
-      state.model = buildModel(rows);
-      var now = new Date();
-      el("updated").textContent = "Last updated " + now.toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  function stamp(){
+    var now = new Date();
+    el("updated").textContent = "Live · updated " + now.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  }
+
+  // initial=true shows the spinner; auto-refresh updates silently.
+  function load(initial){
+    if(initial){
+      el("content").innerHTML = '<div class="state"><div class="spinner"></div><h3>Loading live data…</h3><p>Fetching the Scorecard tab from Google Sheets.</p></div>';
+    }
+    return fetchFirst(urls()).then(function(csv){
+      state.model = buildModel(parseCSV(csv));
+      stamp();
       render();
-    }).catch(function(err){
-      el("content").innerHTML =
-        '<div class="state"><h3>Couldn\'t load live data</h3>'+
-        '<p>The dashboard reads the <b>Scorecard</b> tab directly from Google Sheets, which requires the sheet to be public. '+
-        'In the sheet, go to <code>File → Share → Publish to web → Publish</code>, then reload.</p>'+
-        '<button class="retry" id="retryBtn">Reload</button></div>';
-      var rb = el("retryBtn"); if(rb) rb.onclick = load;
+    }).catch(function(){
+      if(initial || !state.model){
+        el("content").innerHTML =
+          '<div class="state"><h3>Couldn\'t load live data</h3>'+
+          '<p>The dashboard reads the <b>Scorecard</b> tab directly from Google Sheets, which requires the sheet to be public. '+
+          'In the sheet, go to <code>File → Share → Publish to web → Publish</code>, then reload.</p>'+
+          '<button class="retry" id="retryBtn">Reload</button></div>';
+        var rb = el("retryBtn"); if(rb) rb.onclick = function(){ load(true); };
+        el("updated").textContent = "Offline · retrying";
+      }
+      // On a failed silent refresh we keep the last good data on screen.
     });
   }
 
@@ -550,7 +526,10 @@
     toast("Categories are defined in the Scorecard sheet — add a new row there and it appears here automatically.");
   });
 
-  load();
+  // Initial load, then auto-refresh every 5 minutes (and when the tab regains focus).
+  load(true);
+  setInterval(function(){ load(false); }, REFRESH_MS);
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) load(false); });
 })();
 </script>
 </body>
