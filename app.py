@@ -236,21 +236,35 @@ button[kind="headerNoPadding"] {
 """, unsafe_allow_html=True)
 
 
-# ── Helper: render a Mermaid flowchart (dark theme) ───────────────────────────
-def render_mermaid(code, height=360):
+# ── Helper: render a Mermaid flowchart (dark theme, large + scrollable) ───────
+def render_mermaid(code, height=460):
     """Render a Mermaid diagram inside an embedded component.
-    The diagram code is passed to mermaid.render() as a JS string so that
-    HTML tags inside node labels (e.g. <br/>) are preserved correctly.
-    Horizontal (left-to-right) charts may scroll sideways on small screens."""
+    The diagram is rendered at its natural (large) size and scaled up; the
+    container scrolls horizontally (and vertically) so wide charts get
+    left/right navigation instead of being shrunk to fit."""
     html = """
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
 <style>
-  body { background: #0e1117; margin: 0; padding: 0; }
-  #chart { display: flex; justify-content: flex-start; overflow-x: auto; }
-  #chart svg { height: auto; }
+  html, body { background: #0e1117; margin: 0; padding: 0; }
+  /* Scroll when the chart is larger than the screen → left/right navigation. */
+  #chart {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    white-space: nowrap;
+    padding-bottom: 10px;
+    box-sizing: border-box;
+  }
+  /* Render the diagram at its natural (large) size — do NOT shrink to fit. */
+  #chart svg { height: auto !important; max-width: none !important; }
+  /* Themed scrollbars so the navigation is clearly visible. */
+  #chart::-webkit-scrollbar { height: 14px; width: 14px; }
+  #chart::-webkit-scrollbar-track { background: #161b22; border-radius: 7px; }
+  #chart::-webkit-scrollbar-thumb { background: #3a4250; border-radius: 7px; }
+  #chart::-webkit-scrollbar-thumb:hover { background: #4a5365; }
   .err { color: #ff8a8a; font-family: monospace; padding: 1rem; }
 </style>
 </head>
@@ -258,12 +272,29 @@ def render_mermaid(code, height=360):
   <div id="chart"></div>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose',
+      themeVariables: { fontSize: '20px' },
+      flowchart: { useMaxWidth: false, htmlLabels: true, nodeSpacing: 60, rankSpacing: 95, padding: 18 }
+    });
     const code = `__MERMAID_CODE__`;
     const el = document.getElementById('chart');
     try {
       const { svg } = await mermaid.render('graphDiv', code);
       el.innerHTML = svg;
+      // Scale the diagram up so it reads comfortably; the container scrolls.
+      const s = el.querySelector('svg');
+      if (s) {
+        let w = 0, h = 0;
+        if (s.viewBox && s.viewBox.baseVal && s.viewBox.baseVal.width) {
+          w = s.viewBox.baseVal.width; h = s.viewBox.baseVal.height;
+        } else { const bb = s.getBBox(); w = bb.width; h = bb.height; }
+        const scale = 1.45;
+        s.setAttribute('width', Math.round(w * scale));
+        s.setAttribute('height', Math.round(h * scale));
+      }
     } catch (e) {
       el.innerHTML = '<pre class="err">' + (e && e.message ? e.message : e) + '</pre>';
     }
@@ -429,7 +460,8 @@ elif page == "A Review":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_A_REVIEW, height=300)
+    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
+    render_mermaid(FLOW_A_REVIEW, height=380)
 
     st.subheader("Match Distribution Priority")
     st.markdown(
@@ -498,7 +530,8 @@ elif page == "Hypercare Review":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_HYPERCARE, height=360)
+    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
+    render_mermaid(FLOW_HYPERCARE, height=520)
 
     st.subheader("How Teams Are Added")
     st.markdown(
@@ -538,7 +571,8 @@ elif page == "Automated Match Extraction":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_EXTRACTION, height=300)
+    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
+    render_mermaid(FLOW_EXTRACTION, height=380)
 
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
@@ -610,7 +644,8 @@ elif page == "Automated Match Distribution":
     )
 
     st.subheader("Process Flow")
-    render_mermaid(FLOW_DISTRIBUTION, height=520)
+    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
+    render_mermaid(FLOW_DISTRIBUTION, height=620)
 
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
