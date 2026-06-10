@@ -274,6 +274,10 @@ with st.sidebar:
     st.button("📊  Team Productivity", key="nav_team_productivity",
               use_container_width=True, on_click=go_to, args=("Team Productivity",))
 
+    # -- Customer Complaints (live dashboard — top-level item) --
+    st.button("🗒️  Customer Complaints", key="nav_customer_complaints",
+              use_container_width=True, on_click=go_to, args=("Customer Complaints",))
+
     # -- "Review Processes" dropdown --
     with st.expander("🔍  Review Processes", expanded=True):
         st.button("A Review", key="nav_a_review",
@@ -593,6 +597,246 @@ def render_team_productivity():
         )
 
 
+# ── Live Customer Complaints data + dashboard (read straight from Sheets) ─────
+_COMPLAINTS_CSV = (
+    "https://docs.google.com/spreadsheets/d/1bAif9RXwpopZuNx8f7-DgCPPOiMOrHAFpOyE0INM0SU"
+    "/gviz/tq?tqx=out:csv&sheet=Customers%20Complaints"
+)
+# The gviz header row comes back partly blank, so we parse by fixed column index.
+_C = {"id": 0, "app": 1, "match_id": 2, "ctype": 3, "issue": 4, "customer": 10,
+      "validity": 11, "cdate": 12, "wb": 14, "month": 15, "frt": 19, "sla": 20,
+      "qatl": 21, "reviewer": 23, "collector": 24, "responsible": 25, "match_name": 26}
+_VALIDITY_COLORS = {"Valid": "#6FCF97", "Invalid": "#EB8C87",
+                    "Duplicate": "#F2C94C", "Unspecified": "#6f7a8a"}
+_APP_COLORS = {"Umbrella": "#B58BD8", "Tornado": "#68A4C4", "Unknown": "#6f7a8a"}
+
+
+def _dur_hours(value):
+    """Parse an 'H:MM:SS' duration into hours; guard broken values (e.g. negatives)."""
+    s = str(value).strip()
+    if not s or ":" not in s:
+        return None
+    parts = s.split(":")
+    try:
+        h, m = int(parts[0]), int(parts[1])
+        sec = int(parts[2]) if len(parts) > 2 else 0
+    except ValueError:
+        return None
+    if h < 0 or h > 1000:  # the sheet occasionally holds corrupt cells
+        return None
+    return h + m / 60 + sec / 3600
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_complaints():
+    """Read the raw 'Customers Complaints' tab and shape it into tidy rows.
+
+    Cached for 5 minutes. Every figure is derived live from the sheet.
+    """
+    raw = pd.read_csv(_COMPLAINTS_CSV, header=None, dtype=str, keep_default_na=False)
+    month_lookup = {m: i for i, m in enumerate(_MONTHS)}
+    recs = []
+    for row in raw.values.tolist():
+        if len(row) <= _C["responsible"]:
+            continue
+        idv = str(row[_C["id"]]).strip()
+        if not re.match(r"^\d+$", idv):  # data rows have a positive integer ID
+            continue
+        recs.append({
+            "ID": int(idv),
+            "App": row[_C["app"]].strip() or "Unknown",
+            "Customer": row[_C["customer"]].strip() or "Unknown",
+            "Validity": row[_C["validity"]].strip() or "Unspecified",
+            "Complaint Type": row[_C["ctype"]].strip() or "Unknown",
+            "Issue": row[_C["issue"]].strip() or "Unknown",
+            "Month": row[_C["month"]].strip() or "Unknown",
+            "Responsible": row[_C["responsible"]].strip() or "Unassigned",
+            "Reviewer": row[_C["reviewer"]].strip(),
+            "Collector": row[_C["collector"]].strip(),
+            "frt_h": _dur_hours(row[_C["frt"]]),
+            "sla_h": _dur_hours(row[_C["sla"]]),
+        })
+    df = pd.DataFrame(recs)
+    if not df.empty:
+        df["month_idx"] = df["Month"].map(month_lookup).fillna(99).astype(int)
+    return {"df": df, "fetched_at": datetime.now()}
+
+
+def _months_present(df):
+    return [m for m in _MONTHS if m in set(df["Month"])]
+
+
+def _count_chart(series, label, color="#68A4C4", horizontal=False, top=None):
+    vc = series.value_counts()
+    if top:
+        vc = vc.head(top)
+    cdf = vc.reset_index()
+    cdf.columns = [label, "Complaints"]
+    base = alt.Chart(cdf)
+    if horizontal:
+        enc = base.mark_bar(color=color, cornerRadiusEnd=3).encode(
+            y=alt.Y(f"{label}:N", sort="-x", title=None),
+            x=alt.X("Complaints:Q", title="Complaints"),
+            tooltip=[label, "Complaints"])
+        return enc.properties(height=max(140, 26 * len(cdf)))
+    return base.mark_bar(color=color, cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+        x=alt.X(f"{label}:N", sort="-y", title=None),
+        y=alt.Y("Complaints:Q", title="Complaints"),
+        tooltip=[label, "Complaints"]).properties(height=240)
+
+
+@_auto_refresh
+def render_customer_complaints():
+    # -- Controls (before load, so Refresh applies immediately) ----------------
+    c1, c2, c3, c4 = st.columns([2, 1.6, 2, 1])
+    with c4:
+        st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Refresh", use_container_width=True, key="cc_refresh"):
+            load_complaints.clear()
+
+    try:
+        data = load_complaints()
+    except Exception as exc:  # noqa: BLE001
+        st.error(
+            "Couldn't read the **Customers Complaints** tab from Google Sheets. The sheet "
+            "must be shared so anyone with the link can view it."
+        )
+        st.caption(f"Technical detail: {exc}")
+        return
+
+    df = data["df"]
+    if df.empty:
+        st.info("No complaints found in the sheet yet.")
+        return
+
+    month_opts = ["All months"] + _months_present(df)
+    period = c1.selectbox("Filter by month", month_opts, key="cc_month")
+    validity_choice = c2.selectbox("Validity", ["All", "Valid", "Invalid", "Duplicate"],
+                                   key="cc_validity")
+    view = c3.radio("View", ["Summary", "Breakdowns"], horizontal=True, key="cc_view")
+
+    fm = df if period == "All months" else df[df["Month"] == period]
+    fv = fm if validity_choice == "All" else fm[fm["Validity"] == validity_choice]
+
+    # -- Headline KPIs ---------------------------------------------------------
+    total = len(fm)
+    valid = int((fm["Validity"] == "Valid").sum())
+    invalid = int((fm["Validity"] == "Invalid").sum())
+    dup = int((fm["Validity"] == "Duplicate").sum())
+    valid_pct = (valid / total * 100) if total else 0
+    avg_sla = fm["sla_h"].dropna().mean()
+    avg_frt = fm["frt_h"].dropna().mean()
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total complaints", f"{total:,}")
+    k2.metric("Valid rate", f"{valid_pct:.0f}%")
+    k3.metric("Valid", f"{valid:,}")
+    k4.metric("Invalid", f"{invalid:,}")
+    bits = [f"{dup} duplicate", f"{fm['Customer'].nunique()} customers"]
+    if pd.notna(avg_sla):
+        bits.append(f"avg resolution {avg_sla:.1f}h")
+    if pd.notna(avg_frt):
+        bits.append(f"avg first response {avg_frt*60:.0f} min")
+    st.progress(min(1.0, valid_pct / 100), text=" · ".join(bits))
+    st.caption(f"Live from the Customers Complaints tab · updated "
+               f"{data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    st.divider()
+
+    val_scale = alt.Scale(domain=list(_VALIDITY_COLORS), range=list(_VALIDITY_COLORS.values()))
+
+    if view == "Summary":
+        st.markdown("##### Complaints over time")
+        mv = (fm.groupby(["month_idx", "Month", "Validity"]).size()
+                .reset_index(name="Complaints").sort_values("month_idx"))
+        order = [m for m in _MONTHS if m in set(mv["Month"])]
+        st.altair_chart(
+            alt.Chart(mv).mark_bar().encode(
+                x=alt.X("Month:N", sort=order, title=None),
+                y=alt.Y("Complaints:Q", stack="zero", title="Complaints"),
+                color=alt.Color("Validity:N", scale=val_scale,
+                                legend=alt.Legend(title=None, orient="top")),
+                tooltip=["Month", "Validity", "Complaints"]).properties(height=260),
+            use_container_width=True,
+        )
+
+        a, b = st.columns(2)
+        with a:
+            st.markdown("##### Validity breakdown")
+            vc = fm["Validity"].value_counts().reset_index()
+            vc.columns = ["Validity", "Complaints"]
+            st.altair_chart(
+                alt.Chart(vc).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+                    x=alt.X("Validity:N", title=None,
+                            sort=["Valid", "Invalid", "Duplicate", "Unspecified"]),
+                    y=alt.Y("Complaints:Q", title="Complaints"),
+                    color=alt.Color("Validity:N", scale=val_scale, legend=None),
+                    tooltip=["Validity", "Complaints"]).properties(height=240),
+                use_container_width=True,
+            )
+        with b:
+            st.markdown("##### Avg resolution time by month")
+            ms = (fm.dropna(subset=["sla_h"]).groupby(["month_idx", "Month"])["sla_h"]
+                    .mean().reset_index().sort_values("month_idx"))
+            if ms.empty:
+                st.caption("No resolution times recorded for this selection.")
+            else:
+                st.altair_chart(
+                    alt.Chart(ms).mark_bar(color="#68A4C4", cornerRadiusTopLeft=3,
+                                           cornerRadiusTopRight=3).encode(
+                        x=alt.X("Month:N", sort=[m for m in _MONTHS if m in set(ms["Month"])],
+                                title=None),
+                        y=alt.Y("sla_h:Q", title="Avg hours"),
+                        tooltip=["Month", alt.Tooltip("sla_h:Q", title="Avg hours",
+                                                      format=".1f")]).properties(height=240),
+                    use_container_width=True,
+                )
+
+    else:  # Breakdowns
+        if validity_choice != "All":
+            st.caption(f"Showing **{validity_choice}** complaints only.")
+        if fv.empty:
+            st.info("No complaints match this filter.")
+        else:
+            st.markdown("##### Top customers")
+            st.altair_chart(_count_chart(fv["Customer"], "Customer", horizontal=True, top=12),
+                            use_container_width=True)
+
+            a, b = st.columns(2)
+            with a:
+                st.markdown("##### By app")
+                ac = fv["App"].value_counts().reset_index()
+                ac.columns = ["App", "Complaints"]
+                st.altair_chart(
+                    alt.Chart(ac).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+                        x=alt.X("App:N", title=None), y=alt.Y("Complaints:Q", title="Complaints"),
+                        color=alt.Color("App:N",
+                                        scale=alt.Scale(domain=list(_APP_COLORS),
+                                                        range=list(_APP_COLORS.values())),
+                                        legend=None),
+                        tooltip=["App", "Complaints"]).properties(height=240),
+                    use_container_width=True,
+                )
+            with b:
+                st.markdown("##### By complaint type")
+                st.altair_chart(_count_chart(fv["Complaint Type"], "Complaint Type"),
+                                use_container_width=True)
+
+            st.markdown("##### Top complaint issues")
+            st.altair_chart(_count_chart(fv["Issue"], "Issue", horizontal=True, top=12),
+                            use_container_width=True)
+
+            st.markdown("##### By responsible team")
+            st.altair_chart(_count_chart(fv["Responsible"], "Responsible", color="#B58BD8"),
+                            use_container_width=True)
+
+    with st.expander("View the complaints as a table"):
+        show = fv.sort_values("ID", ascending=False).copy()
+        show["Resolution (h)"] = show["sla_h"].round(2)
+        show = show[["ID", "Month", "Customer", "App", "Complaint Type", "Issue",
+                     "Validity", "Resolution (h)", "Responsible"]]
+        st.dataframe(show, use_container_width=True, hide_index=True)
+
+
 # ── Page Router ───────────────────────────────────────────────────────────────
 page = st.session_state.page
 
@@ -893,3 +1137,13 @@ elif page == "Team Productivity":
         "Sheets. Refreshes automatically every 5 minutes.",
     )
     render_team_productivity()
+
+# ── Page: Customer Complaints (live dashboard) ────────────────────────────────
+elif page == "Customer Complaints":
+    render_page_header(
+        "Quality",
+        "Customer Complaints",
+        "Live analysis of customer complaints, read straight from the Complaints sheet "
+        "in Google Sheets. Refreshes automatically every 5 minutes.",
+    )
+    render_customer_complaints()
