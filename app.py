@@ -552,12 +552,31 @@ elif page == "Automated Match Distribution":
 """
     )
 
-    # -- Future improvements (bottom) --
+    # -- Future improvements --
     with st.expander("🚀  Future Improvements (Next Phase)", expanded=False):
         st.markdown(
             """
 - Automating the distribution of Hypercare and high-priority matches using advanced conditions.
-- Automatic task allocation when no standard matches are available.
 - Enhancing assignment logic based on individual reviewer performance and qualification metrics.
 """
         )
+
+    # -- Code update log + simple, non-technical summary --
+    st.subheader("Code Updated — 9 June 2026")
+    st.markdown("**Simple Summary**")
+    st.markdown("In plain terms, here is exactly what happens when a reviewer submits a request:")
+    st.markdown(
+        """
+1. **The reviewer submits the form.** They enter their HR code and send the request — no need to message the Team Leader anymore.
+2. **The system identifies them.** It looks up the HR code to confirm who the reviewer is and whether they are on the Live team or an Offline team.
+3. **It checks their shift time.** The request is compared against the reviewer's scheduled shift:
+   - **Too early?** If they ask before their shift is allowed to start, they receive an "Early Start" message telling them the exact time they may begin. No match is given yet.
+   - **On time?** If they are within their shift window, the request proceeds normally.
+   - **Late finish?** If they ask well after their shift has ended, they still get served, but the request is marked with the amount of delay for tracking.
+4. **It finds work by priority.** The system goes through the task types in order of importance and gives the reviewer the first available match. If two matches are equally important, the one that has been waiting longest is assigned first.
+5. **If the top option is empty, it keeps looking.** When the highest-priority task has nothing available, the system moves down the list until it finds work. Once something is assigned, the remaining lower-priority options are simply noted as already handled.
+6. **If nothing is available anywhere,** the reviewer is told there are no matches to distribute, and the Team Leader is notified so they can provide another task.
+7. **Some matches stay manual.** Hypercare and other high-priority games are deliberately left out of the automatic process and are still assigned by Team Leaders.
+8. **Requests are handled one at a time.** If several people submit at the same moment, the requests line up and are processed in order, so nothing is lost and no match is given to two people.
+"""
+    )
