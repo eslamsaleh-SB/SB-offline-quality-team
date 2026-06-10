@@ -666,23 +666,22 @@ def _months_present(df):
     return [m for m in _MONTHS if m in set(df["Month"])]
 
 
-def _count_chart(series, label, color="#68A4C4", horizontal=False, top=None):
-    vc = series.value_counts()
-    if top:
-        vc = vc.head(top)
-    cdf = vc.reset_index()
+def _count_chart(series, label, color="#68A4C4", horizontal=False):
+    """Bar chart of category counts. Shows every value, whole-number axis,
+    and full (untruncated) category labels."""
+    cdf = series.value_counts().reset_index()
     cdf.columns = [label, "Complaints"]
+    count_axis = alt.Axis(format="d", tickMinStep=1)        # 1, 2, 3 — no decimals
     base = alt.Chart(cdf)
     if horizontal:
-        enc = base.mark_bar(color=color, cornerRadiusEnd=3).encode(
-            y=alt.Y(f"{label}:N", sort="-x", title=None),
-            x=alt.X("Complaints:Q", title="Complaints"),
-            tooltip=[label, "Complaints"])
-        return enc.properties(height=max(140, 26 * len(cdf)))
+        return base.mark_bar(color=color, cornerRadiusEnd=3).encode(
+            y=alt.Y(f"{label}:N", sort="-x", title=None, axis=alt.Axis(labelLimit=360)),
+            x=alt.X("Complaints:Q", title="Complaints", axis=count_axis),
+            tooltip=[label, "Complaints"]).properties(height=max(160, 28 * len(cdf)))
     return base.mark_bar(color=color, cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
-        x=alt.X(f"{label}:N", sort="-y", title=None),
-        y=alt.Y("Complaints:Q", title="Complaints"),
-        tooltip=[label, "Complaints"]).properties(height=240)
+        x=alt.X(f"{label}:N", sort="-y", title=None, axis=alt.Axis(labelLimit=360, labelAngle=-40)),
+        y=alt.Y("Complaints:Q", title="Complaints", axis=count_axis),
+        tooltip=[label, "Complaints"]).properties(height=260)
 
 
 @_auto_refresh
@@ -709,10 +708,13 @@ def render_customer_complaints():
         st.info("No complaints found in the sheet yet.")
         return
 
+    # Duplicates are excluded from the entire dashboard.
+    n_dup = int((df["Validity"] == "Duplicate").sum())
+    df = df[df["Validity"] != "Duplicate"].copy()
+
     month_opts = ["All months"] + _months_present(df)
     period = c1.selectbox("Filter by month", month_opts, key="cc_month")
-    validity_choice = c2.selectbox("Validity", ["All", "Valid", "Invalid", "Duplicate"],
-                                   key="cc_validity")
+    validity_choice = c2.selectbox("Validity", ["All", "Valid", "Invalid"], key="cc_validity")
     view = c3.radio("View", ["Summary", "Breakdowns"], horizontal=True, key="cc_view")
 
     fm = df if period == "All months" else df[df["Month"] == period]
@@ -722,7 +724,6 @@ def render_customer_complaints():
     total = len(fm)
     valid = int((fm["Validity"] == "Valid").sum())
     invalid = int((fm["Validity"] == "Invalid").sum())
-    dup = int((fm["Validity"] == "Duplicate").sum())
     valid_pct = (valid / total * 100) if total else 0
     avg_sla = fm["sla_h"].dropna().mean()
     avg_frt = fm["frt_h"].dropna().mean()
@@ -732,11 +733,13 @@ def render_customer_complaints():
     k2.metric("Valid rate", f"{valid_pct:.0f}%")
     k3.metric("Valid", f"{valid:,}")
     k4.metric("Invalid", f"{invalid:,}")
-    bits = [f"{dup} duplicate", f"{fm['Customer'].nunique()} customers"]
+    bits = [f"{fm['Customer'].nunique()} customers"]
     if pd.notna(avg_sla):
         bits.append(f"avg resolution {avg_sla:.1f}h")
     if pd.notna(avg_frt):
         bits.append(f"avg first response {avg_frt*60:.0f} min")
+    if n_dup:
+        bits.append(f"{n_dup} duplicates excluded")
     st.progress(min(1.0, valid_pct / 100), text=" · ".join(bits))
     st.caption(f"Live from the Customers Complaints tab · updated "
                f"{data['fetched_at'].strftime('%b %d, %I:%M %p')}")
@@ -752,7 +755,8 @@ def render_customer_complaints():
         st.altair_chart(
             alt.Chart(mv).mark_bar().encode(
                 x=alt.X("Month:N", sort=order, title=None),
-                y=alt.Y("Complaints:Q", stack="zero", title="Complaints"),
+                y=alt.Y("Complaints:Q", stack="zero", title="Complaints",
+                        axis=alt.Axis(format="d", tickMinStep=1)),
                 color=alt.Color("Validity:N", scale=val_scale,
                                 legend=alt.Legend(title=None, orient="top")),
                 tooltip=["Month", "Validity", "Complaints"]).properties(height=260),
@@ -766,9 +770,9 @@ def render_customer_complaints():
             vc.columns = ["Validity", "Complaints"]
             st.altair_chart(
                 alt.Chart(vc).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
-                    x=alt.X("Validity:N", title=None,
-                            sort=["Valid", "Invalid", "Duplicate", "Unspecified"]),
-                    y=alt.Y("Complaints:Q", title="Complaints"),
+                    x=alt.X("Validity:N", title=None, sort=["Valid", "Invalid"]),
+                    y=alt.Y("Complaints:Q", title="Complaints",
+                            axis=alt.Axis(format="d", tickMinStep=1)),
                     color=alt.Color("Validity:N", scale=val_scale, legend=None),
                     tooltip=["Validity", "Complaints"]).properties(height=240),
                 use_container_width=True,
@@ -797,8 +801,8 @@ def render_customer_complaints():
         if fv.empty:
             st.info("No complaints match this filter.")
         else:
-            st.markdown("##### Top customers")
-            st.altair_chart(_count_chart(fv["Customer"], "Customer", horizontal=True, top=12),
+            st.markdown("##### Complaints by customer")
+            st.altair_chart(_count_chart(fv["Customer"], "Customer", horizontal=True),
                             use_container_width=True)
 
             a, b = st.columns(2)
@@ -808,7 +812,9 @@ def render_customer_complaints():
                 ac.columns = ["App", "Complaints"]
                 st.altair_chart(
                     alt.Chart(ac).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
-                        x=alt.X("App:N", title=None), y=alt.Y("Complaints:Q", title="Complaints"),
+                        x=alt.X("App:N", title=None),
+                        y=alt.Y("Complaints:Q", title="Complaints",
+                                axis=alt.Axis(format="d", tickMinStep=1)),
                         color=alt.Color("App:N",
                                         scale=alt.Scale(domain=list(_APP_COLORS),
                                                         range=list(_APP_COLORS.values())),
@@ -821,8 +827,8 @@ def render_customer_complaints():
                 st.altair_chart(_count_chart(fv["Complaint Type"], "Complaint Type"),
                                 use_container_width=True)
 
-            st.markdown("##### Top complaint issues")
-            st.altair_chart(_count_chart(fv["Issue"], "Issue", horizontal=True, top=12),
+            st.markdown("##### Complaints by issue")
+            st.altair_chart(_count_chart(fv["Issue"], "Issue", horizontal=True),
                             use_container_width=True)
 
             st.markdown("##### By responsible team")
