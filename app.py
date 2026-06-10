@@ -708,9 +708,11 @@ def render_customer_complaints():
         st.info("No complaints found in the sheet yet.")
         return
 
-    # Duplicates are excluded from the entire dashboard.
+    # Only classified complaints (Valid / Invalid) are analysed, so the total always
+    # equals Valid + Invalid. Duplicates and any not-yet-classified rows are excluded.
     n_dup = int((df["Validity"] == "Duplicate").sum())
-    df = df[df["Validity"] != "Duplicate"].copy()
+    n_unclassified = int((~df["Validity"].isin(["Valid", "Invalid", "Duplicate"])).sum())
+    df = df[df["Validity"].isin(["Valid", "Invalid"])].copy()
 
     month_opts = ["All months"] + _months_present(df)
     period = c1.selectbox("Filter by month", month_opts, key="cc_month")
@@ -740,6 +742,8 @@ def render_customer_complaints():
         bits.append(f"avg first response {avg_frt*60:.0f} min")
     if n_dup:
         bits.append(f"{n_dup} duplicates excluded")
+    if n_unclassified:
+        bits.append(f"{n_unclassified} unclassified excluded")
     st.progress(min(1.0, valid_pct / 100), text=" · ".join(bits))
     st.caption(f"Live from the Customers Complaints tab · updated "
                f"{data['fetched_at'].strftime('%b %d, %I:%M %p')}")
