@@ -235,143 +235,6 @@ button[kind="headerNoPadding"] {
 </style>
 """, unsafe_allow_html=True)
 
-
-# ── Helper: render a Mermaid flowchart (dark theme, large + scrollable) ───────
-def render_mermaid(code, height=460):
-    """Render a Mermaid diagram inside an embedded component.
-    The diagram is rendered at its natural (large) size and scaled up; the
-    container scrolls horizontally (and vertically) so wide charts get
-    left/right navigation instead of being shrunk to fit."""
-    html = """
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<style>
-  html, body { background: #0e1117; margin: 0; padding: 0; }
-  /* Scroll when the chart is larger than the screen → left/right navigation. */
-  #chart {
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    white-space: nowrap;
-    padding-bottom: 10px;
-    box-sizing: border-box;
-  }
-  /* Render the diagram at its natural (large) size — do NOT shrink to fit. */
-  #chart svg { height: auto !important; max-width: none !important; }
-  /* Themed scrollbars so the navigation is clearly visible. */
-  #chart::-webkit-scrollbar { height: 14px; width: 14px; }
-  #chart::-webkit-scrollbar-track { background: #161b22; border-radius: 7px; }
-  #chart::-webkit-scrollbar-thumb { background: #3a4250; border-radius: 7px; }
-  #chart::-webkit-scrollbar-thumb:hover { background: #4a5365; }
-  .err { color: #ff8a8a; font-family: monospace; padding: 1rem; }
-</style>
-</head>
-<body>
-  <div id="chart"></div>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      securityLevel: 'loose',
-      themeVariables: { fontSize: '20px' },
-      flowchart: { useMaxWidth: false, htmlLabels: true, nodeSpacing: 60, rankSpacing: 95, padding: 18 }
-    });
-    const code = `__MERMAID_CODE__`;
-    const el = document.getElementById('chart');
-    try {
-      const { svg } = await mermaid.render('graphDiv', code);
-      el.innerHTML = svg;
-      // Scale the diagram up so it reads comfortably; the container scrolls.
-      const s = el.querySelector('svg');
-      if (s) {
-        let w = 0, h = 0;
-        if (s.viewBox && s.viewBox.baseVal && s.viewBox.baseVal.width) {
-          w = s.viewBox.baseVal.width; h = s.viewBox.baseVal.height;
-        } else { const bb = s.getBBox(); w = bb.width; h = bb.height; }
-        const scale = 1.45;
-        s.setAttribute('width', Math.round(w * scale));
-        s.setAttribute('height', Math.round(h * scale));
-      }
-    } catch (e) {
-      el.innerHTML = '<pre class="err">' + (e && e.message ? e.message : e) + '</pre>';
-    }
-  </script>
-</body>
-</html>
-""".replace("__MERMAID_CODE__", code)
-    components.html(html, height=height, scrolling=True)
-
-
-# ── Process flowcharts (high-level, business terms, horizontal LR) ────────────
-FLOW_A_REVIEW = """
-flowchart LR
-    A([Match Collected]) --> B[Distribute by Priority<br/>Customer · Opponent · Trial · Academy · P1/P2]
-    B --> C[Review Match Facts & Events]
-    C --> D{Errors Found?}
-    D -- Yes --> E[Correct & Update Event Details]
-    D -- No --> F[Confirm Accuracy]
-    E --> G[Log Corrections to Dashboard]
-    F --> G
-    G --> H[Generate Quality Score per Collector]
-    H --> I([Deliver Data with Zero Errors])
-"""
-
-FLOW_HYPERCARE = """
-flowchart LR
-    A([Team Added to Hypercare List]) --> B{How Was It Added?}
-    B -- Internal Decision --> C[Quality Monitoring & Team Evaluation]
-    B -- Customer Request --> D[Client Requests Heightened Scrutiny]
-    C --> E[Assign Most Experienced Reviewers]
-    D --> E
-    E --> F{Review Scope?}
-    F -- Full Match --> G[Review Entire 90 Minutes]
-    F -- Player-Specific --> H[Audit Single Player Data]
-    F -- Pressure Events --> I[Identify · Correct · Add Pressures]
-    F -- Zero-Post-Edit --> J[No Modifications After Collection]
-    G --> K([Deliver Highest-Quality Data])
-    H --> K
-    I --> K
-    J --> K
-"""
-
-FLOW_EXTRACTION = """
-flowchart LR
-    A([Tableau Email Every 15 Minutes<br/>with Completed Matches]) --> B[Bot Reads PDF Attachments]
-    B --> C[Extract Match IDs Automatically]
-    C --> D{Duplicate Entry?}
-    D -- Yes --> E[Skip Match]
-    D -- No --> F[Add Match to Tracking Sheet<br/>with Date & Timestamp]
-    E --> G[End of Shift]
-    F --> G
-    G --> H[Team Leader 5-Minute Validation vs Tableau]
-    H --> I([Tracking Sheet Complete])
-"""
-
-FLOW_DISTRIBUTION = """
-flowchart LR
-    A([Reviewer Submits Request via Form + HR Code]) --> B[Identify Reviewer]
-    B --> C{Reviewer Recognized?}
-    C -- No --> X[Inform Reviewer: Not Recognized] --> Z([End])
-    C -- Yes --> D{Live or Offline Team?}
-    D -- Live --> E[Check Live Shift Time]
-    D -- Offline --> F[Check Offline Shift Time]
-    E --> G{Is it an Early Start?}
-    F --> G
-    G -- Yes --> H[Show Allowed Start Time<br/>No Match Assigned Yet] --> Z
-    G -- No --> I[Find Available Work by Priority<br/>Customer · Opponent · Trial · Academy · Other]
-    I -. Hypercare & High-Priority .-> Q[Assigned Manually by Team Leader]
-    I --> J{Match Available?}
-    J -- No --> K[Inform Reviewer: No Matches<br/>Notify Team Leader] --> Z
-    J -- Yes --> L[Assign First Available Match<br/>Tie-break: Longest Waiting First]
-    L --> M[Record Date & Time<br/>Confirm in Tracking Sheet]
-    M --> N{Requested After Shift Ended?}
-    N -- Yes --> O[Log Delay for Tracking] --> P([Match Distributed])
-    N -- No --> P
-"""
-
 # ── Navigation state ──────────────────────────────────────────────────────────
 if "page" not in st.session_state:
     st.session_state.page = "Overview"
@@ -417,6 +280,11 @@ with st.sidebar:
         st.button("Automated Match Distribution", key="nav_auto_distribution",
                   use_container_width=True, on_click=go_to, args=("Automated Match Distribution",))
 
+    # -- "Team Productivity" dropdown --
+    with st.expander("📊  Team Productivity", expanded=True):
+        st.button("Scorecard Gallery", key="nav_scorecard_gallery",
+                  use_container_width=True, on_click=go_to, args=("Scorecard Gallery",))
+
 # ── Helper: standalone per-page header ────────────────────────────────────────
 def render_page_header(eyebrow, title, subtitle=""):
     subtitle_html = f'<div class="subtitle">{subtitle}</div>' if subtitle else ""
@@ -458,10 +326,6 @@ elif page == "A Review":
         "Collection phase. Its primary purpose is to review match facts, ensuring that "
         "data is delivered to the customer with **zero errors** regarding these specific events."
     )
-
-    st.subheader("Process Flow")
-    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
-    render_mermaid(FLOW_A_REVIEW, height=380)
 
     st.subheader("Match Distribution Priority")
     st.markdown(
@@ -529,10 +393,6 @@ elif page == "Hypercare Review":
         "updated based on current circumstances."
     )
 
-    st.subheader("Process Flow")
-    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
-    render_mermaid(FLOW_HYPERCARE, height=520)
-
     st.subheader("How Teams Are Added")
     st.markdown(
         """
@@ -569,10 +429,6 @@ elif page == "Automated Match Extraction":
         "This document explains the evolution of our match distribution workflow, highlighting "
         "the transition from a manual tracking method to a **fully automated bot solution**."
     )
-
-    st.subheader("Process Flow")
-    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
-    render_mermaid(FLOW_EXTRACTION, height=380)
 
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
@@ -643,10 +499,6 @@ elif page == "Automated Match Distribution":
         "and bots**."
     )
 
-    st.subheader("Process Flow")
-    st.caption("Scroll left / right to navigate the chart if it is wider than the screen.")
-    render_mermaid(FLOW_DISTRIBUTION, height=620)
-
     # -- Side-by-side comparison: old vs new --
     col1, col2 = st.columns(2)
 
@@ -706,6 +558,15 @@ elif page == "Automated Match Distribution":
 """
     )
 
+    # -- Future improvements --
+    with st.expander("🚀  Future Improvements (Next Phase)", expanded=False):
+        st.markdown(
+            """
+- Automating the distribution of Hypercare and high-priority matches using advanced conditions.
+- Enhancing assignment logic based on individual reviewer performance and qualification metrics.
+"""
+        )
+
     # -- Code update log + simple, non-technical summary --
     st.subheader("Code Updated — 9 June 2026")
     st.markdown("**Simple Summary**")
@@ -726,11 +587,25 @@ elif page == "Automated Match Distribution":
 """
     )
 
-    # -- Future Improvements — kept as the LAST section on the page --
-    st.subheader("Future Improvements (Next Phase)")
-    st.markdown(
-        """
-- Automating the distribution of Hypercare and high-priority matches using advanced conditions.
-- Enhancing assignment logic based on individual reviewer performance and qualification metrics.
-"""
+# ── Page: Scorecard Gallery (Team Productivity — live dashboard) ──────────────
+elif page == "Scorecard Gallery":
+    render_page_header(
+        "Team Productivity",
+        "Scorecard Gallery",
+        "Live collection performance, pulled directly from the Scorecard tab in Google Sheets.",
     )
+
+    # The dashboard is a self-contained HTML/CSS/JS component. It fetches the
+    # Scorecard tab live (client-side) every time the page loads, so the numbers
+    # stay in sync with the sheet automatically — nothing is hard-coded here.
+    _dashboard_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "scorecard_dashboard.html")
+    try:
+        with open(_dashboard_path, "r", encoding="utf-8") as _f:
+            _dashboard_html = _f.read()
+        components.html(_dashboard_html, height=2000, scrolling=True)
+    except FileNotFoundError:
+        st.error(
+            "Could not find **scorecard_dashboard.html** next to `app.py`. "
+            "Make sure the dashboard file sits in the same folder as the app."
+        )
