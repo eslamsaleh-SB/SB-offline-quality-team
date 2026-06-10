@@ -1,6 +1,10 @@
 import os
+import re
+from datetime import datetime
+
+import altair as alt
+import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -294,6 +298,300 @@ def render_page_header(eyebrow, title, subtitle=""):
         {subtitle_html}
     </div>
     """, unsafe_allow_html=True)
+
+# ── Live Scorecard data + dashboard (read straight from Google Sheets) ────────
+_SHEET_ID = "1hHRnpri4jryPKzSR-h_obHCGzEckAd6OwP1ZhwSIiHo"
+_SCORECARD_CSV = (
+    "https://docs.google.com/spreadsheets/d/" + _SHEET_ID
+    + "/gviz/tq?tqx=out:csv&sheet=Scorecard"
+)
+_MONTHS = ["January", "February", "March", "April", "May", "June",
+           "July", "August", "September", "October", "November", "December"]
+_SKIP_WORDS = {"date", "target", "total", "week", "wb", "year", "month", "day",
+               "collected matches", "collected"}
+_CAT_COLORS = ["#68A4C4", "#B58BD8", "#6FCF97", "#F2C94C", "#EB8C87", "#7FB3FF"]
+
+
+def _to_num(value):
+    """Turn a sheet cell like '1,076' or '' into a float."""
+    if value is None:
+        return 0.0
+    cleaned = re.sub(r"[^0-9.\-]", "", str(value))
+    if cleaned in ("", "-", "."):
+        return 0.0
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+
+def _is_iso(value):
+    return bool(re.match(r"^\d{4}-\d{2}-\d{2}$", str(value).strip()))
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_scorecard():
+    """Read the Scorecard tab directly from Google Sheets and shape it.
+
+    Cached for 5 minutes, so the page stays in sync with the sheet without
+    re-downloading on every interaction. Nothing is hard-coded — every number
+    comes from the live sheet.
+    """
+    raw = pd.read_csv(_SCORECARD_CSV, header=None, dtype=str, keep_default_na=False)
+    grid = raw.values.tolist()
+
+    # 1) Locate the row that holds the weekly (week-beginning) dates.
+    date_row, best = -1, 0
+    for i, row in enumerate(grid):
+        hits = sum(1 for c in row if _is_iso(c))
+        if hits > best:
+            best, date_row = hits, i
+    if date_row < 0 or best < 2:
+        raise ValueError("Could not find the weekly date row in the Scorecard tab.")
+
+    week_cols, week_dates = [], []
+    for ci, val in enumerate(grid[date_row]):
+        if _is_iso(val):
+            week_cols.append(ci)
+            week_dates.append(datetime.strptime(str(val).strip(), "%Y-%m-%d"))
+    wset = set(week_cols)
+
+    # 2) Detect category rows (Umbrella, Tornado, …); the "Total" row is skipped.
+    cats = []
+    for ri, row in enumerate(grid):
+        if ri == date_row:
+            continue
+        weekly = [_to_num(row[c]) if c < len(row) else 0.0 for c in week_cols]
+        total = sum(weekly)
+        name = ""
+        for k in (1, 0, 2, 3):  # prefer column B, then A, then C/D
+            if k >= len(row) or k in wset:
+                continue
+            cell = str(row[k]).strip()
+            if not cell or re.match(r"^[\d.,%\-]+$", cell) or cell.lower() in _SKIP_WORDS:
+                continue
+            name = cell
+            break
+        target = 0.0
+        for k in range(min(4, len(row))):
+            if k not in wset:
+                target = max(target, _to_num(row[k]))
+        if name and (total > 0 or target > 0):
+            cats.append({"name": name, "target": target, "weekly": weekly, "total": total})
+    if not cats:
+        raise ValueError("No category rows found in the Scorecard tab.")
+
+    # 3) Tidy table for charts + a per-month roll-up.
+    records, mmap, order = [], {}, []
+    for ci, d in enumerate(week_dates):
+        key = (d.year, d.month)
+        if key not in mmap:
+            mmap[key] = {"name": _MONTHS[d.month - 1], "year": d.year, "month_idx": d.month - 1,
+                         "weeks": [], "total": 0.0, "per_cat": {c["name"]: 0.0 for c in cats}}
+            order.append(key)
+        mo = mmap[key]
+        week_total = 0.0
+        for c in cats:
+            v = c["weekly"][ci]
+            week_total += v
+            mo["per_cat"][c["name"]] += v
+            records.append({"date": d, "month": _MONTHS[d.month - 1],
+                            "month_idx": d.month - 1, "category": c["name"], "value": v})
+        mo["weeks"].append({"date": d, "total": week_total})
+        mo["total"] += week_total
+
+    return {
+        "categories": cats,
+        "months": [mmap[k] for k in order],
+        "long": pd.DataFrame(records),
+        "total_collected": sum(c["total"] for c in cats),
+        "total_target": sum(c["target"] for c in cats),
+        "fetched_at": datetime.now(),
+    }
+
+
+def _auto_refresh(func):
+    """Re-run just this section every 5 min, if this Streamlit build supports it."""
+    frag = getattr(st, "fragment", None) or getattr(st, "experimental_fragment", None)
+    if frag is None:
+        return func
+    try:
+        return frag(run_every=300)(func)
+    except Exception:
+        try:
+            return frag(func)
+        except Exception:
+            return func
+
+
+def _color_scale(cats):
+    return alt.Scale(domain=[c["name"] for c in cats], range=_CAT_COLORS[: len(cats)])
+
+
+@_auto_refresh
+def render_team_productivity():
+    # -- Controls (handled before loading so Refresh takes effect immediately) --
+    c1, c2, c3 = st.columns([2.2, 2.2, 1])
+    period = c1.selectbox(
+        "Filter by period",
+        ["Full Year", "Q1 · Jan–Mar", "Q2 · Apr–Jun", "Q3 · Jul–Sep", "Q4 · Oct–Dec"],
+        key="tp_period",
+    )
+    view = c2.radio("View", ["Monthly timeline", "By category"],
+                    horizontal=True, key="tp_view")
+    with c3:
+        st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Refresh", use_container_width=True):
+            load_scorecard.clear()
+
+    try:
+        data = load_scorecard()
+    except Exception as exc:  # noqa: BLE001
+        st.error(
+            "Couldn't read the **Scorecard** tab from Google Sheets. The sheet must be "
+            "shared so anyone with the link can view it (Share → General access → "
+            "Anyone with the link → Viewer)."
+        )
+        st.caption(f"Technical detail: {exc}")
+        return
+
+    cats = data["categories"]
+    long = data["long"]
+    total_collected = data["total_collected"]
+    total_target = data["total_target"]
+    overall = (total_collected / total_target * 100) if total_target else 0.0
+
+    quarters = {"Q1 · Jan–Mar": [0, 1, 2], "Q2 · Apr–Jun": [3, 4, 5],
+                "Q3 · Jul–Sep": [6, 7, 8], "Q4 · Oct–Dec": [9, 10, 11]}
+    scope = quarters.get(period)
+    months = data["months"] if scope is None else [m for m in data["months"] if m["month_idx"] in scope]
+    fl = long if scope is None else long[long["month_idx"].isin(scope)]
+
+    # -- Headline KPIs ---------------------------------------------------------
+    m_tot = (fl.groupby(["month_idx", "month"])["value"].sum()
+               .reset_index().sort_values("month_idx"))
+    peak = m_tot.loc[m_tot["value"].idxmax()] if (not m_tot.empty and m_tot["value"].max() > 0) else None
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Overall progress", f"{overall:.0f}%" if overall >= 99.95 else f"{overall:.1f}%")
+    k2.metric("Total matches", f"{int(total_collected):,}")
+    k3.metric("Global target", f"{int(total_target):,}")
+    k4.metric("Peak month", peak["month"] if peak is not None else "—",
+              help=(f"{int(peak['value']):,} matches" if peak is not None else None))
+    st.progress(min(1.0, (total_collected / total_target) if total_target else 0.0),
+                text=f"{int(total_collected):,} of {int(total_target):,} matches collected "
+                     f"· {len(cats)} categories ({', '.join(c['name'] for c in cats)})")
+    st.caption(f"Live from the Scorecard tab · updated {data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    st.divider()
+
+    if view == "Monthly timeline":
+        st.markdown("##### Monthly collections")
+        st.altair_chart(
+            alt.Chart(m_tot).mark_bar(color="#68A4C4", cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+            .encode(x=alt.X("month:N", sort=list(m_tot["month"]), title=None),
+                    y=alt.Y("value:Q", title="Matches"),
+                    tooltip=[alt.Tooltip("month:N", title="Month"),
+                             alt.Tooltip("value:Q", title="Matches", format=",")])
+            .properties(height=260),
+            use_container_width=True,
+        )
+
+        st.markdown("##### Weekly trend by category")
+        wk = fl.groupby(["date", "category"])["value"].sum().reset_index()
+        st.altair_chart(
+            alt.Chart(wk).mark_bar()
+            .encode(x=alt.X("date:T", title=None),
+                    y=alt.Y("value:Q", title="Matches", stack="zero"),
+                    color=alt.Color("category:N", scale=_color_scale(cats),
+                                    legend=alt.Legend(title=None, orient="top")),
+                    tooltip=[alt.Tooltip("date:T", title="Week of"), "category",
+                             alt.Tooltip("value:Q", title="Matches", format=",")])
+            .properties(height=260),
+            use_container_width=True,
+        )
+
+        st.markdown("##### Monthly gallery")
+        if not months:
+            st.info("No months in this period.")
+        else:
+            cols = st.columns(3)
+            for i, mo in enumerate(months):
+                with cols[i % 3]:
+                    with st.container(border=True):
+                        st.markdown(
+                            f"**{mo['name']} {mo['year']}** &nbsp;"
+                            f"<span style='color:#68A4C4;font-size:.8rem'>{len(mo['weeks'])} weeks</span>",
+                            unsafe_allow_html=True,
+                        )
+                        st.metric("Total monthly collections", f"{int(mo['total']):,}")
+                        if mo["total"] > 0:
+                            wdf = pd.DataFrame([{"date": w["date"],
+                                                 "week": w["date"].strftime("%d %b"),
+                                                 "matches": w["total"]} for w in mo["weeks"]])
+                            st.altair_chart(
+                                alt.Chart(wdf).mark_bar(color="#68A4C4")
+                                .encode(x=alt.X("date:T", title=None,
+                                                axis=alt.Axis(format="%d", labelFontSize=9)),
+                                        y=alt.Y("matches:Q", title=None),
+                                        tooltip=[alt.Tooltip("week:N", title="Week of"),
+                                                 alt.Tooltip("matches:Q", title="Matches", format=",")])
+                                .properties(height=90),
+                                use_container_width=True,
+                            )
+                            for c in cats:
+                                v = mo["per_cat"][c["name"]]
+                                pct = (v / mo["total"] * 100) if mo["total"] else 0
+                                st.progress(min(1.0, v / mo["total"] if mo["total"] else 0),
+                                            text=f"{c['name']}: {int(v):,} · {pct:.0f}%")
+                        else:
+                            st.caption("No collections recorded yet.")
+
+        with st.expander("View the numbers as a table"):
+            table = (fl.pivot_table(index="month", columns="category", values="value",
+                                    aggfunc="sum").reindex([m["name"] for m in months]))
+            if not table.empty:
+                table["Total"] = table.sum(axis=1)
+            st.dataframe(table.style.format("{:,.0f}"), use_container_width=True)
+
+    else:  # By category
+        st.markdown("##### Progress by category")
+        for c in cats:
+            pct = (c["total"] / c["target"] * 100) if c["target"] else 0
+            st.markdown(f"**{c['name']}** — {int(c['total']):,} of {int(c['target']):,} ({pct:.0f}%)")
+            st.progress(min(1.0, c["total"] / c["target"] if c["target"] else 0))
+
+        st.markdown("##### Collected vs target")
+        cmp_df = pd.DataFrame(
+            [{"category": c["name"], "Collected": c["total"], "Target": c["target"]} for c in cats]
+        ).melt("category", var_name="Measure", value_name="Matches")
+        st.altair_chart(
+            alt.Chart(cmp_df).mark_bar()
+            .encode(x=alt.X("category:N", title=None),
+                    y=alt.Y("Matches:Q"),
+                    color=alt.Color("Measure:N",
+                                    scale=alt.Scale(domain=["Collected", "Target"],
+                                                    range=["#68A4C4", "#3a4a57"]),
+                                    legend=alt.Legend(title=None, orient="top")),
+                    xOffset="Measure:N",
+                    tooltip=["category", "Measure", alt.Tooltip("Matches:Q", format=",")])
+            .properties(height=300),
+            use_container_width=True,
+        )
+
+        st.markdown("##### Monthly trend by category")
+        trend = fl.groupby(["date", "category"])["value"].sum().reset_index()
+        st.altair_chart(
+            alt.Chart(trend).mark_line(point=True)
+            .encode(x=alt.X("date:T", title=None),
+                    y=alt.Y("value:Q", title="Matches"),
+                    color=alt.Color("category:N", scale=_color_scale(cats),
+                                    legend=alt.Legend(title=None, orient="top")),
+                    tooltip=[alt.Tooltip("date:T", title="Week of"), "category",
+                             alt.Tooltip("value:Q", title="Matches", format=",")])
+            .properties(height=280),
+            use_container_width=True,
+        )
+
 
 # ── Page Router ───────────────────────────────────────────────────────────────
 page = st.session_state.page
@@ -591,20 +889,7 @@ elif page == "Team Productivity":
     render_page_header(
         "Performance",
         "Team Productivity",
-        "Live collection performance, pulled directly from the Scorecard tab in Google Sheets. Auto-refreshes every 5 minutes.",
+        "Live collection performance, read straight from the Scorecard tab in Google "
+        "Sheets. Refreshes automatically every 5 minutes.",
     )
-
-    # The dashboard is a self-contained HTML/CSS/JS component. It fetches the
-    # Scorecard tab live (client-side) every time the page loads, so the numbers
-    # stay in sync with the sheet automatically — nothing is hard-coded here.
-    _dashboard_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "scorecard_dashboard.html")
-    try:
-        with open(_dashboard_path, "r", encoding="utf-8") as _f:
-            _dashboard_html = _f.read()
-        components.html(_dashboard_html, height=2000, scrolling=True)
-    except FileNotFoundError:
-        st.error(
-            "Could not find **scorecard_dashboard.html** next to `app.py`. "
-            "Make sure the dashboard file sits in the same folder as app.py."
-        )
+    render_team_productivity()
