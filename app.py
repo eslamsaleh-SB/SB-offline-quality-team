@@ -522,20 +522,24 @@ def render_team_productivity():
             for i, mo in enumerate(months):
                 with cols[i % 3]:
                     with st.container(border=True):
+                        # Show only the weeks that actually have collections this month.
+                        weeks_with_data = [w for w in mo["weeks"] if w["total"] > 0]
                         st.markdown(
                             f"**{mo['name']} {mo['year']}** &nbsp;"
-                            f"<span style='color:#68A4C4;font-size:.8rem'>{len(mo['weeks'])} weeks</span>",
+                            f"<span style='color:#68A4C4;font-size:.8rem'>{len(weeks_with_data)} weeks</span>",
                             unsafe_allow_html=True,
                         )
                         st.metric("Total monthly collections", f"{int(mo['total']):,}")
-                        if mo["total"] > 0:
+                        if weeks_with_data:
                             wdf = pd.DataFrame([{"date": w["date"],
+                                                 "day": w["date"].strftime("%d"),
                                                  "week": w["date"].strftime("%d %b"),
-                                                 "matches": w["total"]} for w in mo["weeks"]])
+                                                 "matches": w["total"]} for w in weeks_with_data])
+                            week_order = list(wdf.sort_values("date")["day"])
                             st.altair_chart(
                                 alt.Chart(wdf).mark_bar(color="#68A4C4")
-                                .encode(x=alt.X("date:T", title=None,
-                                                axis=alt.Axis(format="%d", labelFontSize=9)),
+                                .encode(x=alt.X("day:N", sort=week_order, title=None,
+                                                axis=alt.Axis(labelFontSize=9, labelAngle=0)),
                                         y=alt.Y("matches:Q", title=None),
                                         tooltip=[alt.Tooltip("week:N", title="Week of"),
                                                  alt.Tooltip("matches:Q", title="Matches", format=",")])
