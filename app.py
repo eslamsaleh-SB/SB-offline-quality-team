@@ -278,6 +278,9 @@ with st.sidebar:
     st.button("🗒️  Customer Complaints", key="nav_customer_complaints",
               use_container_width=True, on_click=go_to, args=("Customer Complaints",))
 
+    st.button("🎯  Quality Score", key="nav_quality_score",
+              use_container_width=True, on_click=go_to, args=("Quality Score",))
+
     # -- "Review Processes" dropdown --
     with st.expander("🔍  Review Processes", expanded=True):
         st.button("A Review", key="nav_a_review",
@@ -851,6 +854,297 @@ def render_customer_complaints():
         st.dataframe(show, use_container_width=True, hide_index=True)
 
 
+# ── Quality Score Dashboard (live, read straight from Google Sheets) ──────────
+_QS_SHEET_ID = "1meQNmgQTLq58yaC6TIz1zOrdm4ajkaynyK2WJdAvoaU"
+_QS_BASE = ("https://docs.google.com/spreadsheets/d/" + _QS_SHEET_ID
+            + "/gviz/tq?tqx=out:csv&sheet=")
+_QS_WEEK_CSV = _QS_BASE + "Week%20Over%20Week%20Score"
+_QS_MONTH_CSV = _QS_BASE + "Month%20Over%20Month%20Score"
+# Sheet metric label -> short name used in the app.
+_QS_METRIC_MAP = {
+    "collector_score": "score",
+    "errors": "errors",
+    "collector_mod_event_count": "events",
+}
+_QS_COLORS = ["#68A4C4", "#B58BD8", "#6FCF97", "#F2C94C",
+              "#EB8C87", "#7FB3FF", "#E0A458", "#9F8BD8"]
+_QS_QUARTERS = {"Q1 · Jan–Mar": {1, 2, 3}, "Q2 · Apr–Jun": {4, 5, 6},
+                "Q3 · Jul–Sep": {7, 8, 9}, "Q4 · Oct–Dec": {10, 11, 12}}
+
+
+def _qs_parse_period(label, freq):
+    """'4 January 2026' -> date (weekly) | 'January 2026' -> date (monthly)."""
+    fmt = "%d %B %Y" if freq == "week" else "%B %Y"
+    try:
+        return datetime.strptime(str(label).strip(), fmt)
+    except ValueError:
+        return None
+
+
+def _qs_shape(grid, freq):
+    """Shape one tab's grid into tidy rows: module, metric, period, date, value."""
+    hdr = -1
+    for i, row in enumerate(grid):
+        if row and str(row[0]).strip().lower() == "module":
+            hdr = i
+            break
+    if hdr < 0:
+        raise ValueError("Could not find the 'module' header row.")
+
+    header = grid[hdr]
+    pcols, plabels, pdates = [], [], []
+    for ci in range(2, len(header)):
+        lab = str(header[ci]).strip()
+        d = _qs_parse_period(lab, freq) if lab else None
+        if d is None:
+            continue
+        pcols.append(ci)
+        plabels.append(lab)
+        pdates.append(d)
+    if not pcols:
+        raise ValueError("No period columns found in the tab.")
+
+    recs, last_module = [], ""
+    for row in grid[hdr + 1:]:
+        module = str(row[0]).strip() if len(row) > 0 else ""
+        if module:
+            last_module = module           # carry module across merged cells
+        module = module or last_module
+        metric = _QS_METRIC_MAP.get(str(row[1]).strip().lower() if len(row) > 1 else "")
+        if not module or not metric:
+            continue
+        for j, ci in enumerate(pcols):
+            cell = str(row[ci]).strip() if ci < len(row) else ""
+            if cell == "":
+                continue                   # no data for this module / period
+            recs.append({"module": module, "metric": metric,
+                         "period": plabels[j], "date": pdates[j],
+                         "value": _to_num(cell)})
+    return pd.DataFrame(recs)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_quality_scores():
+    """Read both tabs of the Quality Score Dashboard. Cached for 5 minutes."""
+    week = _qs_shape(pd.read_csv(_QS_WEEK_CSV, header=None, dtype=str,
+                                 keep_default_na=False).values.tolist(), "week")
+    month = _qs_shape(pd.read_csv(_QS_MONTH_CSV, header=None, dtype=str,
+                                  keep_default_na=False).values.tolist(), "month")
+    return {"week": week, "month": month, "fetched_at": datetime.now()}
+
+
+def _qs_weighted_score(slice_df):
+    """Overall score for a slice = 1 - errors/events (matches collector_score)."""
+    errs = slice_df.loc[slice_df["metric"] == "errors", "value"].sum()
+    evts = slice_df.loc[slice_df["metric"] == "events", "value"].sum()
+    if evts <= 0:
+        sc = slice_df.loc[slice_df["metric"] == "score", "value"]
+        return (sc.mean() if not sc.empty else 0.0), errs, evts
+    return (1 - errs / evts) * 100, errs, evts
+
+
+@_auto_refresh
+def render_quality_score():
+    # -- Controls (before load, so Refresh applies immediately) ----------------
+    c1, c2, c3 = st.columns([1.5, 3, 1])
+    freq_label = c1.radio("Granularity", ["Weekly", "Monthly"],
+                          horizontal=True, key="qs_freq")
+    with c3:
+        st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+        if st.button("🔄 Refresh", use_container_width=True, key="qs_refresh"):
+            load_quality_scores.clear()
+
+    try:
+        data = load_quality_scores()
+    except Exception as exc:  # noqa: BLE001
+        st.error(
+            "Couldn't read the **Quality Score Dashboard** from Google Sheets. The sheet "
+            "must be shared so anyone with the link can view it."
+        )
+        st.caption(f"Technical detail: {exc}")
+        return
+
+    freq = "week" if freq_label == "Weekly" else "month"
+    df = data[freq]
+    if df.empty:
+        st.info("No quality-score data found in the sheet yet.")
+        return
+
+    periods = (df[["date", "period"]].drop_duplicates()
+               .sort_values("date").reset_index(drop=True))
+    plist = list(periods["period"])
+
+    # -- Period filter: a week range, or a quarter for months ------------------
+    if freq == "week":
+        if len(plist) >= 2:
+            start, end = c2.select_slider("Week range", options=plist,
+                                          value=(plist[0], plist[-1]), key="qs_week_range")
+        else:
+            start = end = plist[0]
+        d0 = periods.loc[periods["period"] == start, "date"].iloc[0]
+        d1 = periods.loc[periods["period"] == end, "date"].iloc[0]
+        period_mask = df["date"].between(min(d0, d1), max(d0, d1))
+        period_note = f"{start} → {end}"
+    else:
+        present_q = [q for q, mset in _QS_QUARTERS.items()
+                     if any(d.month in mset for d in periods["date"])]
+        choice = c2.selectbox("Period", ["Full range"] + present_q, key="qs_month_period")
+        if choice == "Full range":
+            period_mask = pd.Series(True, index=df.index)
+            period_note = f"{plist[0]} → {plist[-1]}"
+        else:
+            period_mask = df["date"].dt.month.isin(_QS_QUARTERS[choice])
+            period_note = choice
+
+    fdf = df[period_mask].copy()
+
+    # -- Module filter ---------------------------------------------------------
+    modules = sorted(df["module"].unique())
+    chosen = st.multiselect("Modules", modules, default=modules, key="qs_modules")
+    if chosen:
+        fdf = fdf[fdf["module"].isin(chosen)]
+    if fdf.empty:
+        st.info("No data for the selected filters.")
+        return
+
+    dom = modules
+    rng = _QS_COLORS[: len(modules)]
+    color_enc = alt.Color("module:N", scale=alt.Scale(domain=dom, range=rng),
+                          legend=alt.Legend(title=None, orient="top"))
+    xfmt = "%d %b" if freq == "week" else "%b %Y"
+
+    # -- Headline KPIs ---------------------------------------------------------
+    ov_score, ov_errs, ov_evts = _qs_weighted_score(fdf)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Overall quality score", f"{ov_score:.2f}%")
+    k2.metric("Total errors", f"{int(ov_errs):,}")
+    k3.metric("Events reviewed", f"{int(ov_evts):,}")
+    k4.metric("Modules tracked", f"{fdf['module'].nunique()}")
+    st.caption(f"Showing {freq_label.lower()} data · {period_note} · "
+               f"updated {data['fetched_at'].strftime('%d %b %Y, %H:%M')}")
+
+    # -- Per-module score cards (score big; total errors in brackets under) ----
+    st.markdown("##### Score by module")
+    card_mods = [m for m in modules if m in set(fdf["module"])]
+    ncol = 4
+    for i in range(0, len(card_mods), ncol):
+        cols = st.columns(ncol)
+        for col, m in zip(cols, card_mods[i:i + ncol]):
+            msl = fdf[fdf["module"] == m]
+            sc, er, _ev = _qs_weighted_score(msl)
+            sline = msl[msl["metric"] == "score"].sort_values("date")
+            delta = (f"{sline['value'].iloc[-1] - sline['value'].iloc[0]:+.2f} pts"
+                     if len(sline) >= 2 else None)
+            with col.container(border=True):
+                st.metric(m.capitalize(), f"{sc:.2f}%", delta=delta)
+                st.markdown(
+                    f"<div style='color:#9aa6b5;font-size:.85rem;margin-top:-.5rem'>"
+                    f"({int(er):,} total errors)</div>", unsafe_allow_html=True)
+
+    # -- Tabbed views ----------------------------------------------------------
+    tab_trend, tab_rank, tab_err, tab_detail, tab_table = st.tabs(
+        ["Score trend", "Ranking", "Errors & volume", "Module detail", "Data table"])
+
+    with tab_trend:
+        sc_df = fdf[fdf["metric"] == "score"]
+        if sc_df.empty:
+            st.info("No score rows for this selection.")
+        else:
+            line = (alt.Chart(sc_df).mark_line(point=True)
+                    .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                            y=alt.Y("value:Q", title="Score (%)",
+                                    scale=alt.Scale(zero=False)),
+                            color=color_enc,
+                            tooltip=["module", alt.Tooltip("period:N", title="Period"),
+                                     alt.Tooltip("value:Q", title="Score", format=".2f")])
+                    .properties(height=360))
+            st.altair_chart(line, use_container_width=True)
+            st.caption("Each line is a module's collector_score over the selected periods.")
+
+    with tab_rank:
+        rrecs = []
+        for m in card_mods:
+            s, e, _v = _qs_weighted_score(fdf[fdf["module"] == m])
+            rrecs.append({"module": m, "score": s, "errors": e})
+        rdf = pd.DataFrame(rrecs)
+        bar = (alt.Chart(rdf).mark_bar(cornerRadiusEnd=3)
+               .encode(y=alt.Y("module:N", sort="x", title=None),
+                       x=alt.X("score:Q", title="Score (%)", scale=alt.Scale(zero=False)),
+                       color=color_enc,
+                       tooltip=["module", alt.Tooltip("score:Q", title="Score", format=".2f"),
+                                alt.Tooltip("errors:Q", title="Errors", format=",")])
+               .properties(height=max(160, 42 * len(rdf))))
+        st.altair_chart(bar, use_container_width=True)
+        st.caption("Lowest score first — these modules need the most attention.")
+
+    with tab_err:
+        er_df = fdf[fdf["metric"] == "errors"]
+        if er_df.empty:
+            st.info("No error rows for this selection.")
+        else:
+            err_chart = (alt.Chart(er_df).mark_bar()
+                         .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                                 y=alt.Y("value:Q", title="Errors", stack="zero"),
+                                 color=color_enc,
+                                 tooltip=["module", alt.Tooltip("period:N", title="Period"),
+                                          alt.Tooltip("value:Q", title="Errors", format=",")])
+                         .properties(height=300))
+            st.altair_chart(err_chart, use_container_width=True)
+        ev_df = (fdf[fdf["metric"] == "events"].groupby("module", as_index=False)["value"].sum())
+        if not ev_df.empty:
+            vol = (alt.Chart(ev_df).mark_bar(cornerRadiusEnd=3)
+                   .encode(y=alt.Y("module:N", sort="-x", title=None),
+                           x=alt.X("value:Q", title="Events reviewed"),
+                           color=color_enc,
+                           tooltip=["module", alt.Tooltip("value:Q", title="Events", format=",")])
+                   .properties(height=max(160, 42 * len(ev_df))))
+            st.markdown("**Volume reviewed per module**")
+            st.altair_chart(vol, use_container_width=True)
+
+    with tab_detail:
+        m = st.selectbox("Module", card_mods, key="qs_detail_mod")
+        msl = fdf[fdf["module"] == m]
+        sc, er, ev = _qs_weighted_score(msl)
+        d1, d2, d3 = st.columns(3)
+        d1.metric("Score", f"{sc:.2f}%")
+        d2.metric("Total errors", f"{int(er):,}")
+        d3.metric("Events reviewed", f"{int(ev):,}")
+        sc_one = msl[msl["metric"] == "score"]
+        if not sc_one.empty:
+            sline = (alt.Chart(sc_one).mark_area(opacity=0.25, line={"color": _QS_COLORS[0]},
+                                                 color=_QS_COLORS[0])
+                     .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                             y=alt.Y("value:Q", title="Score (%)", scale=alt.Scale(zero=False)),
+                             tooltip=[alt.Tooltip("period:N", title="Period"),
+                                      alt.Tooltip("value:Q", title="Score", format=".2f")])
+                     .properties(height=240))
+            st.altair_chart(sline, use_container_width=True)
+        er_one = msl[msl["metric"] == "errors"]
+        if not er_one.empty:
+            ebar = (alt.Chart(er_one).mark_bar(color="#EB8C87")
+                    .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                            y=alt.Y("value:Q", title="Errors"),
+                            tooltip=[alt.Tooltip("period:N", title="Period"),
+                                     alt.Tooltip("value:Q", title="Errors", format=",")])
+                    .properties(height=200))
+            st.altair_chart(ebar, use_container_width=True)
+
+    with tab_table:
+        sc_df = fdf[fdf["metric"] == "score"]
+        if sc_df.empty:
+            st.info("No score rows for this selection.")
+        else:
+            piv = (sc_df.pivot_table(index="period", columns="module",
+                                     values="value", aggfunc="mean", sort=False))
+            order = list(periods.loc[periods["period"].isin(piv.index), "period"])
+            piv = piv.reindex(order)
+            disp = piv.copy()
+            for c in disp.columns:
+                disp[c] = disp[c].map(lambda v: f"{v:.2f}%" if pd.notna(v) else "—")
+            st.dataframe(disp, use_container_width=True)
+            st.caption("collector_score (%) by module and period.")
+
+
 # ── Page Router ───────────────────────────────────────────────────────────────
 page = st.session_state.page
 
@@ -1161,3 +1455,13 @@ elif page == "Customer Complaints":
         "in Google Sheets. Refreshes automatically every 5 minutes.",
     )
     render_customer_complaints()
+
+# ── Page: Quality Score (live dashboard) ──────────────────────────────────────
+elif page == "Quality Score":
+    render_page_header(
+        "Quality",
+        "Quality Score",
+        "Live collector quality scores by module, read straight from the Quality Score "
+        "Dashboard in Google Sheets. Refreshes automatically every 5 minutes.",
+    )
+    render_quality_score()
