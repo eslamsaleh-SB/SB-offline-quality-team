@@ -988,30 +988,34 @@ def render_quality_score():
     else:
         present_q = [q for q, mset in _QS_QUARTERS.items()
                      if any(d.month in mset for d in periods["date"])]
-        choice = c2.selectbox("Period", ["Full range"] + present_q, key="qs_month_period")
+        # Full range, a whole quarter, or a single specific month.
+        choice = c2.selectbox("Period", ["Full range"] + present_q + plist,
+                              key="qs_month_period")
         if choice == "Full range":
             period_mask = pd.Series(True, index=df.index)
             period_note = f"{plist[0]} → {plist[-1]}"
-        else:
+        elif choice in _QS_QUARTERS:
             period_mask = df["date"].dt.month.isin(_QS_QUARTERS[choice])
+            period_note = choice
+        else:
+            period_mask = df["period"] == choice
             period_note = choice
 
     fdf = df[period_mask].copy()
-
-    # -- Module filter ---------------------------------------------------------
-    modules = sorted(df["module"].unique())
-    chosen = st.multiselect("Modules", modules, default=modules, key="qs_modules")
-    if chosen:
-        fdf = fdf[fdf["module"].isin(chosen)]
     if fdf.empty:
-        st.info("No data for the selected filters.")
+        st.info("No data for the selected period.")
         return
 
-    dom = modules
-    rng = _QS_COLORS[: len(modules)]
-    color_enc = alt.Color("module:N", scale=alt.Scale(domain=dom, range=rng),
+    # -- Plotting helpers: one axis label per period, short week/month labels --
+    modules = sorted(df["module"].unique())
+    fmt_short = "%d %b" if freq == "week" else "%b %Y"
+    fdf["plabel"] = fdf["date"].dt.strftime(fmt_short)
+    period_order = list(fdf.sort_values("date")["plabel"].unique())
+    x_period = alt.X("plabel:N", sort=period_order, title=None,
+                     axis=alt.Axis(labelAngle=-40 if freq == "week" else 0))
+    color_enc = alt.Color("module:N",
+                          scale=alt.Scale(domain=modules, range=_QS_COLORS[: len(modules)]),
                           legend=alt.Legend(title=None, orient="top"))
-    xfmt = "%d %b" if freq == "week" else "%b %Y"
 
     # -- Headline KPIs ---------------------------------------------------------
     ov_score, ov_errs, ov_evts = _qs_weighted_score(fdf)
@@ -1046,12 +1050,13 @@ def render_quality_score():
         ["Score trend", "Ranking", "Errors & volume", "Module detail", "Data table"])
 
     with tab_trend:
-        sc_df = fdf[fdf["metric"] == "score"]
+        sel_t = st.multiselect("Modules", card_mods, default=card_mods, key="qs_trend_mods")
+        sc_df = fdf[(fdf["metric"] == "score") & (fdf["module"].isin(sel_t))]
         if sc_df.empty:
-            st.info("No score rows for this selection.")
+            st.info("Pick at least one module to see the trend.")
         else:
             line = (alt.Chart(sc_df).mark_line(point=True)
-                    .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                    .encode(x=x_period,
                             y=alt.Y("value:Q", title="Score (%)",
                                     scale=alt.Scale(zero=False)),
                             color=color_enc,
@@ -1078,19 +1083,21 @@ def render_quality_score():
         st.caption("Lowest score first — these modules need the most attention.")
 
     with tab_err:
-        er_df = fdf[fdf["metric"] == "errors"]
+        sel_e = st.multiselect("Modules", card_mods, default=card_mods, key="qs_err_mods")
+        er_df = fdf[(fdf["metric"] == "errors") & (fdf["module"].isin(sel_e))]
         if er_df.empty:
-            st.info("No error rows for this selection.")
+            st.info("Pick at least one module to see errors.")
         else:
             err_chart = (alt.Chart(er_df).mark_bar()
-                         .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                         .encode(x=x_period,
                                  y=alt.Y("value:Q", title="Errors", stack="zero"),
                                  color=color_enc,
                                  tooltip=["module", alt.Tooltip("period:N", title="Period"),
                                           alt.Tooltip("value:Q", title="Errors", format=",")])
                          .properties(height=300))
             st.altair_chart(err_chart, use_container_width=True)
-        ev_df = (fdf[fdf["metric"] == "events"].groupby("module", as_index=False)["value"].sum())
+        ev_df = (fdf[(fdf["metric"] == "events") & (fdf["module"].isin(sel_e))]
+                 .groupby("module", as_index=False)["value"].sum())
         if not ev_df.empty:
             vol = (alt.Chart(ev_df).mark_bar(cornerRadiusEnd=3)
                    .encode(y=alt.Y("module:N", sort="-x", title=None),
@@ -1113,7 +1120,7 @@ def render_quality_score():
         if not sc_one.empty:
             sline = (alt.Chart(sc_one).mark_area(opacity=0.25, line={"color": _QS_COLORS[0]},
                                                  color=_QS_COLORS[0])
-                     .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                     .encode(x=x_period,
                              y=alt.Y("value:Q", title="Score (%)", scale=alt.Scale(zero=False)),
                              tooltip=[alt.Tooltip("period:N", title="Period"),
                                       alt.Tooltip("value:Q", title="Score", format=".2f")])
@@ -1122,7 +1129,7 @@ def render_quality_score():
         er_one = msl[msl["metric"] == "errors"]
         if not er_one.empty:
             ebar = (alt.Chart(er_one).mark_bar(color="#EB8C87")
-                    .encode(x=alt.X("date:T", title=None, axis=alt.Axis(format=xfmt)),
+                    .encode(x=x_period,
                             y=alt.Y("value:Q", title="Errors"),
                             tooltip=[alt.Tooltip("period:N", title="Period"),
                                      alt.Tooltip("value:Q", title="Errors", format=",")])
