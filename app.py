@@ -287,6 +287,8 @@ with st.sidebar:
                   use_container_width=True, on_click=go_to, args=("A Review",))
         st.button("Hypercare Review", key="nav_hypercare_review",
                   use_container_width=True, on_click=go_to, args=("Hypercare Review",))
+        st.button("Player Review", key="nav_player_review",
+                  use_container_width=True, on_click=go_to, args=("Player Review",))
 
     # -- "Distribution Processes" dropdown --
     with st.expander("📦  Distribution Processes", expanded=True):
@@ -1271,6 +1273,43 @@ elif page == "Hypercare Review":
     st.warning(
         "**Resource Allocation Note:** Only the most experienced collectors and reviewers are "
         "assigned to Hypercare matches to guarantee the highest possible data quality and precision."
+    )
+
+# ── Page: Player Review (standalone header + native Streamlit components) ─────
+elif page == "Player Review":
+    render_page_header(
+        "Review Process",
+        "Player Review Process",
+        "A targeted review that pinpoints exactly which players to check.",
+    )
+
+    st.info(
+        "This process addresses the recent increase in **player attribution errors**. "
+        "Its primary purpose is to provide a targeted review process that helps reviewers "
+        "pinpoint exactly which players to check, eliminating the need to review every "
+        "player and keeping the review queue manageable."
+    )
+
+    st.subheader("Match Coverage Priority")
+    st.markdown(
+        "This review process is applied to **100% of Customer matches**. Lower-priority "
+        "matches will only be included in the review sample if there is remaining capacity "
+        "to accommodate them."
+    )
+
+    st.subheader("Methodology (Dynamic Selection)")
+    st.markdown(
+        "This process relies on **in-match events** to dynamically select players for review. "
+        "The system identifies specific players whose actions appear suspicious or inconsistent "
+        "with their normal match behavior. By utilizing this dynamic method, the process "
+        "successfully catches **74% of errors**."
+    )
+
+    st.subheader("Data Sample and Validation")
+    st.markdown(
+        "To develop and validate this process, multiple player-selection approaches were "
+        "compared. The analysis was conducted using a random sample of **200 matches** that "
+        "had already been verified and resolved by the **Live vs. Offline disputes team**."
     )
 
 # ── Page: Automated Match Extraction (Distribution Processes) ─────────────────
