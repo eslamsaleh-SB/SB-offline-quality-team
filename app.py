@@ -289,6 +289,8 @@ with st.sidebar:
                   use_container_width=True, on_click=go_to, args=("Hypercare Review",))
         st.button("Player Review", key="nav_player_review",
                   use_container_width=True, on_click=go_to, args=("Player Review",))
+        st.button("Sofascore Comparison Tool", key="nav_sofascore",
+                  use_container_width=True, on_click=go_to, args=("Sofascore Comparison Tool",))
 
     # -- "Distribution Processes" dropdown --
     with st.expander("📦  Distribution Processes", expanded=True):
@@ -1336,6 +1338,83 @@ elif page == "Player Review":
         "The next phase is to enable corrections directly through a **product tool** added to the "
         "application. This will allow the fixing process to be performed by importing the CSV into "
         "the application, **without the current manual correction process**."
+    )
+
+# ── Page: Sofascore Comparison Tool (standalone header + native components) ───
+elif page == "Sofascore Comparison Tool":
+    render_page_header(
+        "Review Process",
+        "Sofascore Comparison Tool",
+        "An extra QA layer that flags discrepancies between Sofascore and our data.",
+    )
+
+    st.info(
+        "The **Sofascore Comparison Tool** compares Sofascore event data against our internal "
+        "data to surface discrepancies. It acts as an **additional quality-assurance layer** in "
+        "the daily review of completed matches, helping validate accuracy and confirm no "
+        "important events were missed."
+    )
+
+    st.subheader("How the Tool Works")
+    st.markdown("Every event is compared and sorted into one of two groups:")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.success(
+            "**✅ Matched Events**\n\n"
+            "Exist in **both** Sofascore and our data — confirms the event was collected and "
+            "recorded correctly."
+        )
+    with c2:
+        st.warning(
+            "**⚠️ Unmatched Events**\n\n"
+            "Exist in **one** dataset only. Every unmatched event is reviewed manually to decide "
+            "if it was missed, recorded incorrectly, or differs due to provider methodology."
+        )
+    st.markdown(
+        "> When the review confirms our data is wrong, corrections are applied so the database "
+        "stays accurate and complete."
+    )
+
+    st.subheader("Daily Quality Assurance Process")
+    st.markdown(
+        "Run as part of the daily QA workflow on the day's processed matches, the tool verifies:"
+    )
+    st.markdown(
+        """
+- No important events were missed.
+- All collected events were recorded accurately.
+- Any discrepancies are caught and resolved as early as possible.
+"""
+    )
+
+    st.subheader("League Coverage")
+    st.markdown("Sofascore availability varies by competition, giving three coverage tiers:")
+    cov1, cov2, cov3 = st.columns(3)
+    cov1.metric("Full A Review", "All events")
+    cov2.metric("Facts-Only", "Fact events")
+    cov3.metric("No Data", "No comparison")
+    st.caption(
+        "Full A Review = complete comparison. Facts-Only = limited to fact events. "
+        "No Data = no Sofascore data, so the tool cannot compare."
+    )
+
+    st.subheader("Benefits")
+    st.markdown(
+        """
+- Daily validation of completed matches.
+- Early detection of missing or incorrect events.
+- Improved overall data accuracy.
+- Faster identification and correction of discrepancies.
+- Higher confidence in data quality and completeness.
+"""
+    )
+
+    st.subheader("Expected Outcome")
+    st.success(
+        "Built into the daily review, the tool lets the team continuously monitor data quality, "
+        "quickly spot discrepancies, and keep the database as accurate and complete as possible — "
+        "strengthening the QA workflow and keeping data standards consistent across all matches."
     )
 
 # ── Page: Automated Match Extraction (Distribution Processes) ─────────────────
