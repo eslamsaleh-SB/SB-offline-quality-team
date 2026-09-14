@@ -1279,37 +1279,63 @@ elif page == "Hypercare Review":
 elif page == "Player Review":
     render_page_header(
         "Review Process",
-        "Player Review Process",
-        "A targeted review that pinpoints exactly which players to check.",
+        "Player Review App",
+        "Compare collector work vs reviewer work, then correct the data.",
     )
 
     st.info(
-        "This process addresses the recent increase in **player attribution errors**. "
-        "Its primary purpose is to provide a targeted review process that helps reviewers "
-        "pinpoint exactly which players to check, eliminating the need to review every "
-        "player and keeping the review queue manageable."
+        "The **Player Review App** compares the collector's work with the reviewer's work. "
+        "The reviewer tags the players, the two datasets are compared to identify which side "
+        "is correct and which is incorrect, and the data is then corrected in the application."
     )
 
-    st.subheader("Match Coverage Priority")
+    st.subheader("Process Steps")
+
+    st.markdown("**1. CSV Download**")
     st.markdown(
-        "This review process is applied to **100% of Customer matches**. Lower-priority "
-        "matches will only be included in the review sample if there is remaining capacity "
-        "to accommodate them."
+        "The reviewer receives a CSV file through the website "
+        "[http://195.7.4.251:5015/](http://195.7.4.251:5015/). "
+        "The reviewer enters the **Match ID** and downloads the CSV file."
     )
 
-    st.subheader("Methodology (Dynamic Selection)")
+    st.markdown("**2. CSV Import and Player Tagging**")
     st.markdown(
-        "This process relies on **in-match events** to dynamically select players for review. "
-        "The system identifies specific players whose actions appear suspicious or inconsistent "
-        "with their normal match behavior. By utilizing this dynamic method, the process "
-        "successfully catches **74% of errors**."
+        "The CSV contains the match data. However, when the reviewer imports the CSV into the "
+        "application, the data appears **without player IDs**. The reviewer then adds the players "
+        "to the events."
     )
 
-    st.subheader("Data Sample and Validation")
+    st.markdown("**3. Finish Match and Upload**")
     st.markdown(
-        "To develop and validate this process, multiple player-selection approaches were "
-        "compared. The analysis was conducted using a random sample of **200 matches** that "
-        "had already been verified and resolved by the **Live vs. Offline disputes team**."
+        "Once the reviewer completes the tagging, they click **Finish Match**. The file is then "
+        "uploaded to **Google Drive**."
+    )
+
+    st.markdown("**4. Data Comparison**")
+    st.markdown(
+        "The next stage compares the collector's data with the reviewer's data. "
+        "The comparison includes four possible actions:"
+    )
+    st.markdown(
+        """
+- Collector Right
+- Collector Wrong
+- Both Are Wrong
+- Off-Camera
+"""
+    )
+
+    st.markdown("**5. Data Correction**")
+    st.markdown(
+        "Once the reviewer completes the comparison, they correct the data in the "
+        "**production application**."
+    )
+
+    st.subheader("Next Development Phase")
+    st.success(
+        "The next phase is to enable corrections directly through a **product tool** added to the "
+        "application. This will allow the fixing process to be performed by importing the CSV into "
+        "the application, **without the current manual correction process**."
     )
 
 # ── Page: Automated Match Extraction (Distribution Processes) ─────────────────
