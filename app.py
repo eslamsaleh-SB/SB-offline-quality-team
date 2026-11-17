@@ -1383,162 +1383,282 @@ def _to_agg(df, by, metrics, match_col):
     return out.sort_index()
 
 
-# Semantic colours per metric (same everywhere: cards, charts, tables)
+# ═══════════════════════ Tools Output — executive report UI ═══════════════════════
 _TO_COLORS = {
-    "Matches": "#93a0b2",
-    "Events Reviewed": "#68A4C4",
-    "Collector Wrong": "#EB8C87",
-    "SB Wrong": "#EB8C87",
-    "WS Wrong": "#EB8C87",
-    "Both Wrong": "#F2C94C",
-    "Missing": "#B58BD8",
-    "Already Added": "#6FCF97",
+    "Matches": "#94A3B8", "Events Reviewed": "#3B82F6", "Correct": "#10B981",
+    "Collector Wrong": "#F43F5E", "SB Wrong": "#F43F5E", "WS Wrong": "#F43F5E",
+    "Both Wrong": "#F59E0B", "Missing": "#8B5CF6", "Already Added": "#14B8A6", "Other": "#475569",
 }
+_TO_CSS = """
+<style>
+.xr-hero{background:linear-gradient(135deg,#0f1b33 0%,#111827 55%,#0b1220 100%);
+  border:1px solid #1e2a44;border-radius:20px;padding:26px 28px;margin:6px 0 18px;position:relative;overflow:hidden}
+.xr-hero:after{content:"";position:absolute;right:-80px;top:-80px;width:260px;height:260px;border-radius:50%;
+  background:radial-gradient(circle,rgba(59,130,246,.18),transparent 70%)}
+.xr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.xr-kicker{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#60A5FA}
+.xr-title{font-family:'DM Serif Display',serif;font-size:34px;line-height:1.1;color:#F8FAFC;margin:6px 0 4px}
+.xr-sub{font-size:13px;color:#94A3B8}
+.xr-period{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35);color:#BFDBFE;
+  padding:6px 14px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.xr-body{display:grid;grid-template-columns:220px 1fr;gap:22px;margin-top:22px;align-items:center}
+@media(max-width:900px){.xr-body{grid-template-columns:1fr}}
+.xr-ring{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.xr-ring .cap{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#94A3B8;margin-top:8px;font-weight:700}
+.xr-ring .dl{font-size:12px;margin-top:4px}
+.xr-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.xr-kpi{background:rgba(15,23,42,.65);border:1px solid #1f2a40;border-radius:14px;padding:14px 16px 10px}
+.xr-kpi .l{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:#94A3B8}
+.xr-kpi .dot{width:8px;height:8px;border-radius:50%}
+.xr-kpi .v{font-size:30px;font-weight:700;color:#F8FAFC;letter-spacing:-.02em;margin:6px 0 2px;
+  font-variant-numeric:tabular-nums}
+.xr-kpi .r{font-size:12px;color:#CBD5E1;min-height:16px}
+.xr-kpi .row{display:flex;justify-content:space-between;align-items:flex-end;gap:6px;margin-top:6px}
+.xr-chip{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.xr-good{background:rgba(16,185,129,.15);color:#34D399}.xr-bad{background:rgba(244,63,94,.15);color:#FB7185}
+.xr-flat{background:#1e293b;color:#94A3B8}
+.xr-ins{background:#0f172a;border:1px solid #1e293b;border-left:4px solid #3B82F6;border-radius:14px;
+  padding:16px 20px;margin:0 0 20px}
+.xr-ins h4{margin:0 0 8px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#60A5FA!important}
+.xr-ins ul{margin:0;padding-left:18px}.xr-ins li{color:#E2E8F0!important;font-size:14px;line-height:1.7}
+.xr-h{display:flex;align-items:baseline;gap:10px;margin:26px 0 10px}
+.xr-h b{font-size:18px;color:#F8FAFC;font-weight:700}.xr-h span{font-size:12px;color:#64748B}
+.xr-tbl{width:100%;border-collapse:separate;border-spacing:0;background:#0f172a;border:1px solid #1e293b;
+  border-radius:14px;overflow:hidden;font-size:13px}
+.xr-tbl th{background:#111c33!important;color:#94A3B8!important;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;text-align:left;padding:10px 12px!important;border:none!important}
+.xr-tbl td{padding:9px 12px!important;border:none!important;border-top:1px solid #1e293b!important;color:#E2E8F0!important;
+  font-variant-numeric:tabular-nums}
+.xr-bar{height:8px;border-radius:6px;background:#1e293b;overflow:hidden;display:flex;min-width:120px}
+.xr-bar i{display:block;height:100%}
+.xr-pct{font-weight:700}
+</style>
+"""
 
 
 def _to_color(m):
-    return _TO_COLORS.get(m, "#68A4C4")
+    return _TO_COLORS.get(m, "#3B82F6")
+
+
+def _to_spark(vals, color, w=120, h=34):
+    vals = [float(v) for v in vals]
+    if len(vals) < 2:
+        return ""
+    lo, hi = min(vals), max(vals)
+    rng = (hi - lo) or 1
+    pts = [(i * (w - 4) / (len(vals) - 1) + 2, h - 4 - (v - lo) / rng * (h - 8)) for i, v in enumerate(vals)]
+    line = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    area = f"2,{h} " + line + f" {w - 2},{h}"
+    lx, ly = pts[-1]
+    return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">'
+            f'<polygon points="{area}" fill="{color}" opacity=".14"/>'
+            f'<polyline points="{line}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round"/>'
+            f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="3" fill="{color}"/></svg>')
+
+
+def _to_ring(pct, label, delta_html):
+    pct = max(0.0, min(100.0, pct))
+    r, c = 62, 2 * 3.14159 * 62
+    color = "#10B981" if pct >= 97 else "#F59E0B" if pct >= 93 else "#F43F5E"
+    return (f'<div class="xr-ring"><svg width="160" height="160" viewBox="0 0 160 160">'
+            f'<circle cx="80" cy="80" r="{r}" stroke="#1e293b" stroke-width="12" fill="none"/>'
+            f'<circle cx="80" cy="80" r="{r}" stroke="{color}" stroke-width="12" fill="none" '
+            f'stroke-linecap="round" stroke-dasharray="{c * pct / 100:.1f} {c:.1f}" transform="rotate(-90 80 80)"/>'
+            f'<text x="80" y="78" text-anchor="middle" fill="#F8FAFC" font-size="30" font-weight="700">{pct:.1f}%</text>'
+            f'<text x="80" y="100" text-anchor="middle" fill="#94A3B8" font-size="11">of events correct</text></svg>'
+            f'<div class="cap">{label}</div><div class="dl">{delta_html}</div></div>')
+
+
+def _to_chip(d, is_err, fmt="{:+,}", unit=""):
+    if d == 0 or d != d:
+        return '<span class="xr-chip xr-flat">no change</span>'
+    good = (d < 0) if is_err else (d > 0)
+    arrow = "▲" if d > 0 else "▼"
+    txt = fmt.format(abs(d)).lstrip("+")
+    return f'<span class="xr-chip {"xr-good" if good else "xr-bad"}">{arrow} {txt}{unit}</span>'
 
 
 def _to_style(chart, height):
-    """Dark, quiet chart styling shared by every Tools Output chart."""
     return (chart.properties(height=height, background="transparent")
             .configure_view(strokeWidth=0)
-            .configure_axis(labelColor="#93a0b2", titleColor="#6b778a", gridColor="#1f2530",
-                            domainColor="#262d3a", tickColor="#262d3a", labelFontSize=11,
-                            titleFontSize=11, titleFontWeight="normal")
-            .configure_legend(labelColor="#c9d1dc", labelFontSize=12, symbolType="circle",
-                              orient="top", title=None, padding=0, offset=14)
-            .configure_title(color="#f4f6fa"))
+            .configure_axis(labelColor="#94A3B8", titleColor="#64748B", gridColor="#1e293b",
+                            domain=False, ticks=False, labelFontSize=11, titleFontSize=11,
+                            titleFontWeight="normal", labelPadding=6)
+            .configure_legend(labelColor="#CBD5E1", labelFontSize=12, symbolType="circle",
+                              orient="top", title=None, padding=0, offset=12, columnPadding=18))
 
 
-def _to_section(title, pill=""):
-    pill_html = f'<span class="p">{pill}</span>' if pill else ""
-    st.markdown(f'<div class="to-section"><span class="t">{title}</span>{pill_html}'
-                f'<span class="line"></span></div>', unsafe_allow_html=True)
-
-
-def _to_cards(agg, sel, cols, base, prev_label):
-    """KPI cards for the selected period, with change vs the previous period."""
-    idx = list(agg.index)
-    row = agg.loc[sel]
-    pos = idx.index(sel)
-    prev = agg.loc[idx[pos - 1]] if pos > 0 else None
-    html = ['<div class="to-grid">']
-    for c in cols:
-        val = int(row[c])
-        is_err = c not in ("Matches", base)
-        foot = []
-        if prev is not None:
-            d = val - int(prev[c])
-            if d == 0:
-                foot.append('<span class="to-chip flat">0</span>')
-            else:
-                good = (d < 0) if is_err else (d > 0)
-                cls = ("up-" if d > 0 else "down-") + ("good" if good else "bad")
-                arrow = "▲" if d > 0 else "▼"
-                foot.append(f'<span class="to-chip {cls}">{arrow} {abs(d):,}</span>')
-            foot.append(f"vs {prev_label}")
-        if is_err and row[base]:
-            foot.append(f'<span class="to-rate">· {val / row[base] * 100:.2f}% of reviewed</span>')
-        html.append(f'<div class="to-card" style="--c:{_to_color(c)}"><div class="l">{c}</div>'
-                    f'<div class="v">{val:,}</div><div class="f">{"".join(foot) or "&nbsp;"}</div></div>')
-    html.append("</div>")
-    st.markdown("".join(html), unsafe_allow_html=True)
-
-
-def _to_chart(agg, metrics, match_col, fmt, height=320):
+def _to_trend(agg, cfg, fmt, height=340):
+    """Volume bars (with labels) + error-rate lines (with % labels)."""
+    base_m, errs = cfg["metrics"][0], cfg["errors"]
     a = agg.reset_index()
-    a["label"] = a[a.columns[0]].map(fmt)
-    order = list(a["label"])
-    long = a.melt(id_vars=["label"], value_vars=metrics, var_name="Metric", value_name="Count")
-    bars = alt.Chart(long).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
-        x=alt.X("label:N", sort=order, title=None,
-                axis=alt.Axis(labelAngle=0, labelLimit=140, labelPadding=8)),
-        xOffset=alt.XOffset("Metric:N", sort=metrics),
-        y=alt.Y("Count:Q", title="Events", axis=alt.Axis(format="~s", tickCount=5)),
-        color=alt.Color("Metric:N", sort=metrics,
-                        scale=alt.Scale(domain=metrics, range=[_to_color(m) for m in metrics])),
-        tooltip=[alt.Tooltip("label:N", title="Period"), "Metric",
-                 alt.Tooltip("Count:Q", format=",")])
-    chart = bars
-    if match_col:
-        base = alt.Chart(a).encode(x=alt.X("label:N", sort=order))
-        line = base.mark_line(color="#c9d1dc", strokeWidth=1.6, strokeDash=[4, 3]).encode(
-            y=alt.Y("Matches:Q", title="Matches", axis=alt.Axis(format="d", orient="right",
-                                                                 grid=False, tickCount=5)))
-        pts = base.mark_circle(color="#c9d1dc", size=46).encode(
-            y=alt.Y("Matches:Q", axis=None),
-            tooltip=[alt.Tooltip("label:N", title="Period"), alt.Tooltip("Matches:Q", format=",")])
-        chart = alt.layer(bars, line + pts).resolve_scale(y="independent")
+    a["Period"] = a[a.columns[0]].map(fmt)
+    order = list(a["Period"])
+    x = alt.X("Period:N", sort=order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=150))
+    bars = alt.Chart(a).mark_bar(color="#1d4ed8", opacity=.55, cornerRadiusTopLeft=6,
+                                 cornerRadiusTopRight=6, size=34).encode(
+        x=x, y=alt.Y(f"{base_m}:Q", title=base_m, axis=alt.Axis(format="~s", tickCount=4)),
+        tooltip=["Period", alt.Tooltip(f"{base_m}:Q", format=",")])
+    bar_lbl = bars.mark_text(dy=-8, color="#93C5FD", fontSize=11, fontWeight="bold").encode(
+        text=alt.Text(f"{base_m}:Q", format=",.0f"))
+    rate = a[["Period"] + errs].copy()
+    for e in errs:
+        rate[e] = (a[e] / a[base_m].where(a[base_m] != 0) * 100).round(2)
+    rl = rate.melt(id_vars=["Period"], var_name="Rate", value_name="pct")
+    rl["Rate"] = rl["Rate"] + " %"
+    dom = [e + " %" for e in errs]
+    col = alt.Color("Rate:N", sort=dom, scale=alt.Scale(domain=dom, range=[_to_color(e) for e in errs]))
+    ry = alt.Y("pct:Q", title="Error rate (%)", axis=alt.Axis(orient="right", grid=False, format=".1f"))
+    lines = alt.Chart(rl).mark_line(strokeWidth=2.6, point=alt.OverlayMarkDef(size=60, filled=True)).encode(
+        x=x, y=ry, color=col, tooltip=["Period", "Rate", alt.Tooltip("pct:Q", format=".2f", title="%")])
+    line_lbl = alt.Chart(rl).mark_text(dy=-12, fontSize=11, fontWeight="bold").encode(
+        x=x, y=ry, color=alt.Color("Rate:N", sort=dom, legend=None,
+                                   scale=alt.Scale(domain=dom, range=[_to_color(e) for e in errs])),
+        text=alt.Text("pct:Q", format=".1f"))
+    chart = alt.layer(bars + bar_lbl, lines + line_lbl).resolve_scale(y="independent", color="independent")
     st.altair_chart(_to_style(chart, height), use_container_width=True)
 
 
-def _to_rates_table(agg, metrics, fmt):
-    base = metrics[0]
-    t = agg.copy()
-    for m in metrics[1:]:
-        t[f"{m} %"] = (t[m] / t[base].where(t[base] != 0) * 100).round(2)
-    t.index = [fmt(i) for i in t.index]
-    t.index.name = "Period"
-    st.dataframe(t.iloc[::-1], use_container_width=True,
-                 column_config={c: st.column_config.NumberColumn(format="%.2f%%")
-                                for c in t.columns if c.endswith("%")})
+def _to_volume(agg, cfg, fmt, height=300):
+    """Grouped bars of every metric, each bar labelled."""
+    metrics = cfg["metrics"]
+    a = agg.reset_index()
+    a["Period"] = a[a.columns[0]].map(fmt)
+    order = list(a["Period"])
+    long = a.melt(id_vars=["Period"], value_vars=metrics, var_name="Metric", value_name="Count")
+    enc = dict(x=alt.X("Period:N", sort=order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=150)),
+               xOffset=alt.XOffset("Metric:N", sort=metrics),
+               y=alt.Y("Count:Q", title="Events", scale=alt.Scale(type="symlog"),
+                       axis=alt.Axis(format="~s", tickCount=4)))
+    color = alt.Color("Metric:N", sort=metrics,
+                      scale=alt.Scale(domain=metrics, range=[_to_color(m) for m in metrics]))
+    bars = alt.Chart(long).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
+        **enc, color=color, tooltip=["Period", "Metric", alt.Tooltip("Count:Q", format=",")])
+    lbl = alt.Chart(long).mark_text(dy=-7, fontSize=10, color="#CBD5E1").encode(
+        **enc, detail="Metric:N", text=alt.Text("Count:Q", format="~s"))
+    st.altair_chart(_to_style(bars + lbl, height), use_container_width=True)
 
 
-def _render_tool_output(df, key, metrics, match_col=None):
-    """Period pickers → KPI cards (week + month) → weekly & monthly trends."""
+def _to_insights(agg, sel, cfg, unit):
+    idx = list(agg.index)
+    pos = idx.index(sel)
+    if pos == 0:
+        return []
+    cur, prev = agg.loc[sel], agg.loc[idx[pos - 1]]
+    base = cfg["metrics"][0]
+    out = []
+    if prev[base]:
+        ch = (cur[base] - prev[base]) / prev[base] * 100
+        out.append(f"<b>{base}</b> {'up' if ch >= 0 else 'down'} <b>{abs(ch):.1f}%</b> vs previous "
+                   f"{unit} ({int(prev[base]):,} → {int(cur[base]):,}).")
+    for e in cfg["errors"]:
+        if cur[base] and prev[base]:
+            r1, r0 = cur[e] / cur[base] * 100, prev[e] / prev[base] * 100
+            d = r1 - r0
+            word = "improved" if d < 0 else "worsened" if d > 0 else "held steady"
+            out.append(f"<b>{e}</b> rate {word}: <b>{r1:.2f}%</b> ({d:+.2f} pts).")
+    if "Matches" in cur and prev.get("Matches", 0):
+        out.append(f"<b>{int(cur['Matches']):,}</b> matches reviewed "
+                   f"({int(cur['Matches'] - prev['Matches']):+,} vs previous {unit}).")
+    return out
+
+
+def _to_hdr(title, note=""):
+    st.markdown(f'<div class="xr-h"><b>{title}</b><span>{note}</span></div>', unsafe_allow_html=True)
+
+
+def _render_tool_output(df, key, cfg):
+    """Executive report: hero (score + KPIs + sparklines) → insights → trends → detail."""
     if df.empty:
         st.info("No reviewed data for this selection yet.")
         return
-    cols = (["Matches"] if match_col else []) + metrics
+    metrics, errs, match = cfg["metrics"], cfg["errors"], cfg.get("match")
+    match_col = "Matches" if match else None
     wk = _to_agg(df, "week", metrics, match_col)
     mo = _to_agg(df, "month", metrics, match_col)
 
-    c1, c2, _sp = st.columns([1.2, 1, 1.3])
-    sel_w = c1.selectbox("Week (Sun – Sat)", list(wk.index)[::-1], format_func=_wk_label,
-                         key=f"{key}_wsel")
-    sel_m = c2.selectbox("Month", list(mo.index)[::-1], format_func=_mo_label, key=f"{key}_msel")
+    c1, c2, c3 = st.columns([1, 1.3, 2.2])
+    gran = c1.radio("View by", ["Week", "Month"], horizontal=True, key=f"{key}_gran")
+    agg, fmt, unit = (wk, _wk_label, "week") if gran == "Week" else (mo, _mo_label, "month")
+    sel = c2.selectbox(gran, list(agg.index)[::-1], format_func=fmt, key=f"{key}_{gran}_sel")
 
-    _to_section("This week", _wk_label(sel_w))
-    _to_cards(wk, sel_w, cols, metrics[0], "previous week")
-    _to_section("This month", _mo_label(sel_m))
-    _to_cards(mo, sel_m, cols, metrics[0], "previous month")
+    row = agg.loc[sel]
+    idx = list(agg.index)
+    pos = idx.index(sel)
+    prev = agg.loc[idx[pos - 1]] if pos > 0 else None
+    hist = agg.iloc[max(0, pos - 7):pos + 1]
+    base = metrics[0]
 
-    _to_section("Weekly trend")
+    # ── Hero ──────────────────────────────────────────────
+    kpis = []
+    for m in (["Matches"] if match else []) + metrics:
+        val = int(row[m])
+        is_err = m in errs
+        chip = _to_chip(val - int(prev[m]), is_err) if prev is not None else ""
+        rate = (f"{val / row[base] * 100:.2f}% of reviewed" if is_err and row[base] else "&nbsp;")
+        kpis.append(f'<div class="xr-kpi"><div class="l"><span class="dot" style="background:{_to_color(m)}"></span>{m}</div>'
+                    f'<div class="v">{val:,}</div><div class="r">{rate}</div>'
+                    f'<div class="row">{chip}{_to_spark(hist[m].tolist(), _to_color(m))}</div></div>')
+    ring = ""
+    if cfg.get("score") and row[base]:
+        score = 100 - row[errs].sum() / row[base] * 100
+        dl = ""
+        if prev is not None and prev[base]:
+            ps = 100 - prev[errs].sum() / prev[base] * 100
+            dl = _to_chip(round(score - ps, 2), False, "{:+.2f}", " pts")
+        ring = _to_ring(score, cfg["score"], dl)
+    body_cls = "xr-body" if ring else "xr-body\" style=\"grid-template-columns:1fr"
+    st.markdown(
+        f'<div class="xr-hero"><div class="xr-top"><div><div class="xr-kicker">{cfg["kicker"]}</div>'
+        f'<div class="xr-title">{cfg["title"]}</div><div class="xr-sub">{cfg["source"]}</div></div>'
+        f'<div class="xr-period">{gran} · {fmt(sel)}</div></div>'
+        f'<div class="{body_cls}">{ring}<div class="xr-kpis">{"".join(kpis)}</div></div></div>',
+        unsafe_allow_html=True)
+
+    ins = _to_insights(agg, sel, cfg, unit)
+    if ins:
+        st.markdown('<div class="xr-ins"><h4>Key insights</h4><ul>' +
+                    "".join(f"<li>{i}</li>" for i in ins) + "</ul></div>", unsafe_allow_html=True)
+
+    # ── Trends ────────────────────────────────────────────
+    _to_hdr("Volume & error rate — weekly", "bars = events reviewed · lines = error rate %")
     weeks = list(wk.index)
     wk_view = wk
     if len(weeks) > 1:
-        start_default = weeks[max(0, len(weeks) - _TO_WEEKS_DEFAULT)]
-        rng = st.select_slider("Weeks shown — drag to see more (default: last 6)", options=weeks,
-                               value=(start_default, weeks[-1]), format_func=_wk_label,
-                               key=f"{key}_wrange")
+        rng = st.select_slider("Weeks shown (default: last 6)", options=weeks,
+                               value=(weeks[max(0, len(weeks) - _TO_WEEKS_DEFAULT)], weeks[-1]),
+                               format_func=_wk_label, key=f"{key}_wrange")
         wk_view = wk.loc[rng[0]:rng[1]]
-    _to_chart(wk_view, metrics, match_col, _wk_label)
+    _to_trend(wk_view, cfg, _wk_label)
 
-    _to_section("Monthly trend")
-    _to_chart(mo, metrics, match_col, _mo_label)
+    _to_hdr("Volume & error rate — monthly")
+    _to_trend(mo, cfg, _mo_label)
 
-    with st.expander("📋  Numbers & rates"):
-        w, m = st.tabs(["Weekly", "Monthly"])
-        with w:
-            _to_rates_table(wk, metrics, _wk_label)
-        with m:
-            _to_rates_table(mo, metrics, _mo_label)
+    _to_hdr("Every metric — monthly", "log scale so small counts stay visible")
+    _to_volume(mo, cfg, _mo_label)
+
+    with st.expander("📋  Full numbers & rates"):
+        t1, t2 = st.tabs(["Weekly", "Monthly"])
+        for tab, a, f in ((t1, wk, _wk_label), (t2, mo, _mo_label)):
+            with tab:
+                t = a.copy()
+                for e in errs:
+                    t[f"{e} %"] = (t[e] / t[base].where(t[base] != 0) * 100).round(2)
+                t.index = [f(i) for i in t.index]
+                t.index.name = "Period"
+                st.dataframe(t.iloc[::-1], use_container_width=True,
+                             column_config={c: st.column_config.NumberColumn(format="%.2f%%")
+                                            for c in t.columns if c.endswith("%")})
 
 
-def _to_header(title, source, loader, key, fetched_at=None):
-    c1, c2 = st.columns([5, 1])
-    upd = f" · updated <b>{fetched_at.strftime('%b %d, %I:%M %p')}</b>" if fetched_at else ""
-    c1.markdown(f'<div class="to-head"><div><h3>{title}</h3>'
-                f'<div class="src">{source} · weeks run Sunday → Saturday by '
-                f'<b>collection completion date</b>{upd}</div></div></div>',
-                unsafe_allow_html=True)
-    with c2:
-        st.markdown("<div style='height:1.1rem'></div>", unsafe_allow_html=True)
-        if st.button("↻  Refresh", key=f"{key}_refresh", use_container_width=True):
-            loader.clear()
-            st.rerun()
+def _to_header_bar(loader, key, fetched_at):
+    c1, c2 = st.columns([6, 1])
+    c1.caption(f"Live from Google Sheets · weeks run Sunday → Saturday by collection completion "
+               f"date · updated {fetched_at.strftime('%b %d, %I:%M %p')}")
+    if c2.button("↻ Refresh", key=f"{key}_refresh", use_container_width=True):
+        loader.clear()
+        st.rerun()
 
 
 def _to_load(loader, label):
@@ -1554,9 +1674,23 @@ def _to_load(loader, label):
 def _to_not_connected():
     if _to_configured():
         return False
-    st.info("Tools Output isn't connected yet. Add the service account to Streamlit "
-            "Secrets (see `apps_script/README.md`).")
+    st.info("Tools Output isn't connected yet. Add the service account to Streamlit Secrets.")
     return True
+
+
+_PR_CFG = dict(kicker="Tools Output · Collection quality", title="Player Review App",
+               source="Player Review drive · Resolved folders",
+               metrics=["Events Reviewed", "Collector Wrong", "Both Wrong"],
+               errors=["Collector Wrong", "Both Wrong"], match=True, score="Collector accuracy")
+_SOFA_CFG = dict(kicker="Tools Output · Data comparison", title="Sofascore",
+                 source="Archive Data/Resolved + New Resolved",
+                 metrics=["Events Reviewed", "SB Wrong", "Both Wrong"],
+                 errors=["SB Wrong", "Both Wrong"], match=True, score="SB accuracy")
+_WS_EVENT_NAMES = {"Pass": "through_ball", "TakeOn": "Dribble", "Take_On": "Dribble"}
+_WS_METRICS = ["Events Reviewed", "Missing", "Already Added", "WS Wrong"]
+_WS_CFG = dict(kicker="Tools Output · Validation", title="WhoScored Validation",
+               source="WhoScored sheet · Through-balls (reviewed rows)",
+               metrics=_WS_METRICS, errors=["Missing", "Already Added", "WS Wrong"], match=False)
 
 
 @_auto_refresh
@@ -1566,10 +1700,8 @@ def render_pr_output():
     data = _to_load(load_pr_output, "PR_Summary")
     if data is None:
         return
-    _to_header("Player Review App", "Player Review drive · Resolved folders",
-               load_pr_output, "pr", data["fetched_at"])
-    _render_tool_output(data["df"], "pr", ["Events Reviewed", "Collector Wrong", "Both Wrong"],
-                        match_col="Matches")
+    _to_header_bar(load_pr_output, "pr", data["fetched_at"])
+    _render_tool_output(data["df"], "pr", _PR_CFG)
 
 
 @_auto_refresh
@@ -1579,63 +1711,73 @@ def render_sofa_output():
     data = _to_load(load_sofa_output, "Sofa_Summary")
     if data is None:
         return
-    _to_header("Sofascore", "Archive Data/Resolved + New Resolved", load_sofa_output, "sofa",
-               data["fetched_at"])
-    _render_tool_output(data["df"], "sofa", ["Events Reviewed", "SB Wrong", "Both Wrong"],
-                        match_col="Matches")
+    _to_header_bar(load_sofa_output, "sofa", data["fetched_at"])
+    _render_tool_output(data["df"], "sofa", _SOFA_CFG)
 
 
-_WS_EVENT_NAMES = {"Pass": "through_ball", "TakeOn": "Dribble", "Take_On": "Dribble"}
-_WS_METRICS = ["Events Reviewed", "Missing", "Already Added", "WS Wrong"]
+def _ws_rank_table(t, dim):
+    """HTML ranking table with labelled composition bars."""
+    res = _WS_METRICS[1:]
+    rows = []
+    for name, r in t.iterrows():
+        tot = r["Events Reviewed"] or 1
+        segs = "".join(f'<i style="width:{r[m] / tot * 100:.2f}%;background:{_to_color(m)}"></i>' for m in res)
+        cells = "".join(f'<td><span class="xr-pct" style="color:{_to_color(m)}">{r[m] / tot * 100:.1f}%</span>'
+                        f' <span style="color:#64748B">({int(r[m]):,})</span></td>' for m in res)
+        rows.append(f"<tr><td><b>{name}</b></td><td>{int(r['Events Reviewed']):,}</td>{cells}"
+                    f'<td><div class="xr-bar">{segs}</div></td></tr>')
+    head = "".join(f"<th>{m}</th>" for m in res)
+    st.markdown(f'<table class="xr-tbl"><tr><th>{dim}</th><th>Reviewed</th>{head}<th>Mix</th></tr>'
+                f'{"".join(rows)}</table>', unsafe_allow_html=True)
 
 
 def _ws_breakdown(df, dim, key):
-    """Compare every Event / Competition for one period."""
-    c1, c2, _sp = st.columns([1.2, 1.2, 1.1])
+    c1, c2, _sp = st.columns([1.3, 1.3, 1.6])
     scope = c1.radio("Period", ["Week", "Month", "All time"], horizontal=True, key=f"{key}_scope")
     sub, pill = df, "All time"
     if scope == "Week":
         opts = sorted(df["week"].unique(), reverse=True)
-        sel = c2.selectbox("Week", opts, format_func=lambda t: _wk_label(pd.Timestamp(t)),
-                           key=f"{key}_bw")
+        sel = c2.selectbox("Week", opts, format_func=lambda t: _wk_label(pd.Timestamp(t)), key=f"{key}_bw")
         sub, pill = df[df["week"] == sel], _wk_label(pd.Timestamp(sel))
     elif scope == "Month":
         opts = sorted(df["month"].unique(), reverse=True)
-        sel = c2.selectbox("Month", opts, format_func=lambda t: _mo_label(pd.Timestamp(t)),
-                           key=f"{key}_bm")
+        sel = c2.selectbox("Month", opts, format_func=lambda t: _mo_label(pd.Timestamp(t)), key=f"{key}_bm")
         sub, pill = df[df["month"] == sel], _mo_label(pd.Timestamp(sel))
     t = sub.groupby(dim)[_WS_METRICS].sum().sort_values("Events Reviewed", ascending=False)
     if t.empty:
         st.info("Nothing reviewed in this period.")
         return
-
-    _to_section("Totals", pill)
     tot = t.sum()
-    html = ['<div class="to-grid">']
+    base_tot = tot["Events Reviewed"] or 1
+    kpis = ""
     for m in _WS_METRICS:
-        rate = (f'<span class="to-rate">{tot[m] / tot["Events Reviewed"] * 100:.2f}% of reviewed</span>'
-                if m != "Events Reviewed" and tot["Events Reviewed"] else "&nbsp;")
-        html.append(f'<div class="to-card" style="--c:{_to_color(m)}"><div class="l">{m}</div>'
-                    f'<div class="v">{int(tot[m]):,}</div><div class="f">{rate}</div></div>')
-    st.markdown("".join(html + ["</div>"]), unsafe_allow_html=True)
+        rate = "" if m == "Events Reviewed" else f"{tot[m] / base_tot * 100:.2f}% of reviewed"
+        kpis += (f'<div class="xr-kpi"><div class="l"><span class="dot" style="background:{_to_color(m)}">'
+                 f'</span>{m}</div><div class="v">{int(tot[m]):,}</div><div class="r">{rate}</div></div>')
+    st.markdown(f'<div class="xr-hero"><div class="xr-top"><div><div class="xr-kicker">WhoScored · comparison</div>'
+                f'<div class="xr-title">By {dim.lower()}</div><div class="xr-sub">{len(t)} {dim.lower()}s reviewed'
+                f'</div></div><div class="xr-period">{pill}</div></div>'
+                f'<div class="xr-body" style="grid-template-columns:1fr"><div class="xr-kpis">{kpis}</div></div></div>',
+                unsafe_allow_html=True)
 
-    _to_section(f"By {dim.lower()}", pill)
+    _to_hdr(f"Result mix by {dim.lower()}", "share of reviewed events · labels show %")
     res = _WS_METRICS[1:]
-    long = t[res].reset_index().melt(id_vars=[dim], var_name="Result", value_name="Events")
-    chart = alt.Chart(long).mark_bar(cornerRadiusEnd=3).encode(
-        y=alt.Y(f"{dim}:N", sort=list(t.index), title=None, axis=alt.Axis(labelLimit=260)),
-        x=alt.X("Events:Q", stack="zero", title="Events", axis=alt.Axis(format="~s")),
-        color=alt.Color("Result:N", sort=res,
-                        scale=alt.Scale(domain=res, range=[_to_color(m) for m in res])),
-        tooltip=[dim, "Result", alt.Tooltip("Events:Q", format=",")])
-    st.altair_chart(_to_style(chart, max(200, 34 * len(t))), use_container_width=True)
+    p = t[res].div(t["Events Reviewed"].where(t["Events Reviewed"] != 0), axis=0).mul(100).round(1)
+    long = p.reset_index().melt(id_vars=[dim], var_name="Result", value_name="pct")
+    y = alt.Y(f"{dim}:N", sort=list(t.index), title=None, axis=alt.Axis(labelLimit=240))
+    color = alt.Color("Result:N", sort=res, scale=alt.Scale(domain=res, range=[_to_color(m) for m in res]))
+    bars = alt.Chart(long).mark_bar(height=20).encode(
+        y=y, x=alt.X("pct:Q", stack="zero", title="% of reviewed", scale=alt.Scale(domain=[0, 100])),
+        color=color, order=alt.Order("Result:N"),
+        tooltip=[dim, "Result", alt.Tooltip("pct:Q", format=".1f", title="%")])
+    lbl = alt.Chart(long).transform_filter("datum.pct >= 6").mark_text(
+        color="#0b1220", fontSize=11, fontWeight="bold", dx=-4, align="right").encode(
+        y=y, x=alt.X("pct:Q", stack="zero"), order=alt.Order("Result:N"),
+        detail="Result:N", text=alt.Text("pct:Q", format=".0f"))
+    st.altair_chart(_to_style(bars + lbl, max(200, 34 * len(t))), use_container_width=True)
 
-    out = t.copy()
-    for m in res:
-        out[f"{m} %"] = (out[m] / out["Events Reviewed"] * 100).round(2)
-    st.dataframe(out, use_container_width=True,
-                 column_config={c: st.column_config.NumberColumn(format="%.2f%%")
-                                for c in out.columns if c.endswith("%")})
+    _to_hdr("Ranking", "sorted by events reviewed")
+    _ws_rank_table(t, dim)
 
 
 @_auto_refresh
@@ -1646,26 +1788,25 @@ def render_ws_output():
     if data is None:
         return
     df = data["df"]
-    _to_header("WhoScored Validation", "WhoScored sheet · Through-balls (reviewed rows)",
-               load_ws_output, "ws", data["fetched_at"])
+    _to_header_bar(load_ws_output, "ws", data["fetched_at"])
     t1, t2, t3 = st.tabs(["Overview", "By Event", "By Competition"])
     with t1:
-        _render_tool_output(df, "ws_all", _WS_METRICS)
+        _render_tool_output(df, "ws_all", _WS_CFG)
     with t2:
-        ev = st.selectbox("Event", ["All events (compare)"] + sorted(df["Event"].unique()),
-                          key="ws_ev")
+        ev = st.selectbox("Event", ["All events (compare)"] + sorted(df["Event"].unique()), key="ws_ev")
         if ev.startswith("All events"):
             _ws_breakdown(df, "Event", "ws_evb")
         else:
-            _render_tool_output(df[df["Event"] == ev], f"ws_ev_{ev}", _WS_METRICS)
+            _render_tool_output(df[df["Event"] == ev], f"ws_ev_{ev}",
+                                dict(_WS_CFG, title=f"WhoScored · {ev}"))
     with t3:
-        comp = st.selectbox("Competition",
-                            ["All competitions (compare)"] + sorted(df["Competition"].unique()),
+        comp = st.selectbox("Competition", ["All competitions (compare)"] + sorted(df["Competition"].unique()),
                             key="ws_comp")
         if comp.startswith("All competitions"):
             _ws_breakdown(df, "Competition", "ws_cb")
         else:
-            _render_tool_output(df[df["Competition"] == comp], f"ws_c_{comp}", _WS_METRICS)
+            _render_tool_output(df[df["Competition"] == comp], f"ws_c_{comp}",
+                                dict(_WS_CFG, title=f"WhoScored · {comp}"))
 
 
 # ── Page Router ───────────────────────────────────────────────────────────────
@@ -2131,13 +2272,14 @@ elif page == "Quality Score":
 
 # ── Page: Tools Output (live dashboards for the review tools) ─────────────────
 elif page == "Tools Output":
+    st.markdown(_TO_CSS, unsafe_allow_html=True)
     render_page_header(
-        "Tools",
+        "Executive report",
         "Tools Output",
-        "Review output from the Player Review App, the Sofascore comparison tool and "
-        "WhoScored validation. Weeks run Sunday to Saturday. Refreshes every 5 minutes.",
+        "Quality results from the Player Review App, Sofascore comparison and WhoScored "
+        "validation — live, refreshed every 5 minutes.",
     )
-    _pr_tab, _sofa_tab, _ws_tab = st.tabs(["🎥  Player Review App", "⚽  Sofascore", "✅  WhoScored Validation"])
+    _pr_tab, _sofa_tab, _ws_tab = st.tabs(["Player Review App", "Sofascore", "WhoScored Validation"])
     with _pr_tab:
         render_pr_output()
     with _sofa_tab:
