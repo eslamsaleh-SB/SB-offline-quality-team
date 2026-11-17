@@ -1332,8 +1332,8 @@ def load_pr_output():
     df = pd.DataFrame({
         "Matches": raw["matches"].map(_to_num),
         "Events Reviewed": raw["events_reviewed"].map(_to_num),
-        "Collector Wrong": raw["collector_wrong"].map(_to_num),
-        "Both Wrong": raw["both_wrong"].map(_to_num),
+        # "Wrong" + "Both are wrong" are shown as one number
+        "Collector Wrong": raw["collector_wrong"].map(_to_num) + raw["both_wrong"].map(_to_num),
         "completion_date": raw["completion_date"].str.strip(),
     })
     return {"df": _add_periods(df, "completion_date"), "fetched_at": datetime.now()}
@@ -1345,8 +1345,8 @@ def load_sofa_output():
     df = pd.DataFrame({
         "Matches": raw["matches"].map(_to_num),
         "Events Reviewed": raw["events_reviewed"].map(_to_num),
-        "SB Wrong": raw["sb_wrong"].map(_to_num),
-        "Both Wrong": raw["both_wrong"].map(_to_num),
+        # "SB wrong" + "Both are wrong" are shown as one number
+        "SB Wrong": raw["sb_wrong"].map(_to_num) + raw["both_wrong"].map(_to_num),
         "completion_date": raw["completion_date"].str.strip(),
     })
     return {"df": _add_periods(df, "completion_date"), "fetched_at": datetime.now()}
@@ -1489,55 +1489,71 @@ def _to_style(chart, height):
                               orient="top", title=None, padding=0, offset=12, columnPadding=18))
 
 
-def _to_trend(agg, cfg, fmt, height=340):
-    """Volume bars (with labels) + error-rate lines (with % labels)."""
-    base_m, errs = cfg["metrics"][0], cfg["errors"]
+def _to_metric_chart(agg, metric, fmt, height=230):
+    """One metric = one chart, so value labels never overlap."""
     a = agg.reset_index()
     a["Period"] = a[a.columns[0]].map(fmt)
     order = list(a["Period"])
-    x = alt.X("Period:N", sort=order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=150))
-    bars = alt.Chart(a).mark_bar(color="#1d4ed8", opacity=.55, cornerRadiusTopLeft=6,
-                                 cornerRadiusTopRight=6, size=34).encode(
-        x=x, y=alt.Y(f"{base_m}:Q", title=base_m, axis=alt.Axis(format="~s", tickCount=4)),
-        tooltip=["Period", alt.Tooltip(f"{base_m}:Q", format=",")])
-    bar_lbl = bars.mark_text(dy=-8, color="#93C5FD", fontSize=11, fontWeight="bold").encode(
-        text=alt.Text(f"{base_m}:Q", format=",.0f"))
-    rate = a[["Period"] + errs].copy()
-    for e in errs:
-        rate[e] = (a[e] / a[base_m].where(a[base_m] != 0) * 100).round(2)
-    rl = rate.melt(id_vars=["Period"], var_name="Rate", value_name="pct")
-    rl["Rate"] = rl["Rate"] + " %"
-    dom = [e + " %" for e in errs]
-    col = alt.Color("Rate:N", sort=dom, scale=alt.Scale(domain=dom, range=[_to_color(e) for e in errs]))
-    ry = alt.Y("pct:Q", title="Error rate (%)", axis=alt.Axis(orient="right", grid=False, format=".1f"))
-    lines = alt.Chart(rl).mark_line(strokeWidth=2.6, point=alt.OverlayMarkDef(size=60, filled=True)).encode(
-        x=x, y=ry, color=col, tooltip=["Period", "Rate", alt.Tooltip("pct:Q", format=".2f", title="%")])
-    line_lbl = alt.Chart(rl).mark_text(dy=-12, fontSize=11, fontWeight="bold").encode(
-        x=x, y=ry, color=alt.Color("Rate:N", sort=dom, legend=None,
-                                   scale=alt.Scale(domain=dom, range=[_to_color(e) for e in errs])),
-        text=alt.Text("pct:Q", format=".1f"))
-    chart = alt.layer(bars + bar_lbl, lines + line_lbl).resolve_scale(y="independent", color="independent")
+    color = _to_color(metric)
+    top = float(a[metric].max() or 1)
+    base = alt.Chart(a).encode(
+        x=alt.X("Period:N", sort=order, title=None,
+                axis=alt.Axis(labelAngle=0, labelLimit=120, labelFontSize=10)),
+        y=alt.Y(f"{metric}:Q", title=None, axis=None,
+                scale=alt.Scale(domain=[0, top * 1.22])))
+    bars = base.mark_bar(color=color, cornerRadiusTopLeft=5, cornerRadiusTopRight=5,
+                         opacity=.9).encode(tooltip=["Period", alt.Tooltip(f"{metric}:Q", format=",")])
+    lbl = base.mark_text(dy=-9, color="#E2E8F0", fontSize=12, fontWeight="bold").encode(
+        text=alt.Text(f"{metric}:Q", format=",.0f"))
+    chart = (bars + lbl).properties(title=alt.TitleParams(metric, anchor="start", color=color,
+                                                          fontSize=13, fontWeight="bold", offset=10))
     st.altair_chart(_to_style(chart, height), use_container_width=True)
 
 
-def _to_volume(agg, cfg, fmt, height=300):
-    """Grouped bars of every metric, each bar labelled."""
-    metrics = cfg["metrics"]
+def _ws_combo_chart(agg, fmt, height=280):
+    """WhoScored: Events Reviewed as bars (count inside the bar) + Missing % as a line (label above)."""
     a = agg.reset_index()
     a["Period"] = a[a.columns[0]].map(fmt)
+    a["Missing %"] = (a["Missing"] / a["Events Reviewed"].where(a["Events Reviewed"] != 0) * 100).round(1)
     order = list(a["Period"])
-    long = a.melt(id_vars=["Period"], value_vars=metrics, var_name="Metric", value_name="Count")
-    enc = dict(x=alt.X("Period:N", sort=order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=150)),
-               xOffset=alt.XOffset("Metric:N", sort=metrics),
-               y=alt.Y("Count:Q", title="Events", scale=alt.Scale(type="symlog"),
-                       axis=alt.Axis(format="~s", tickCount=4)))
-    color = alt.Color("Metric:N", sort=metrics,
-                      scale=alt.Scale(domain=metrics, range=[_to_color(m) for m in metrics]))
-    bars = alt.Chart(long).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
-        **enc, color=color, tooltip=["Period", "Metric", alt.Tooltip("Count:Q", format=",")])
-    lbl = alt.Chart(long).mark_text(dy=-7, fontSize=10, color="#CBD5E1").encode(
-        **enc, detail="Metric:N", text=alt.Text("Count:Q", format="~s"))
-    st.altair_chart(_to_style(bars + lbl, height), use_container_width=True)
+    x = alt.X("Period:N", sort=order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=120, labelFontSize=10))
+    rv_top = float(a["Events Reviewed"].max() or 1)
+    pc_top = float(a["Missing %"].max() or 1)
+    yb = alt.Y("Events Reviewed:Q", title="Events reviewed", scale=alt.Scale(domain=[0, rv_top * 1.15]),
+               axis=alt.Axis(format="~s", tickCount=4))
+    bars = alt.Chart(a).mark_bar(color=_to_color("Events Reviewed"), opacity=.55, cornerRadiusTopLeft=5,
+                                 cornerRadiusTopRight=5).encode(
+        x=x, y=yb, tooltip=["Period", alt.Tooltip("Events Reviewed:Q", format=","),
+                            alt.Tooltip("Missing:Q", format=","), alt.Tooltip("Missing %:Q", format=".1f")])
+    bar_lbl = alt.Chart(a).mark_text(baseline="bottom", dy=-4, color="#93C5FD", fontSize=11).encode(
+        x=x, y=alt.Y("Events Reviewed:Q", scale=alt.Scale(domain=[0, rv_top * 1.15]), axis=None),
+        text=alt.Text("Events Reviewed:Q", format=",.0f"))
+    # line lives in the upper part of the chart so its labels never sit on the bar labels
+    yl = alt.Y("Missing %:Q", title="Missing %", scale=alt.Scale(domain=[-pc_top * 1.4, pc_top * 1.25]),
+               axis=alt.Axis(orient="right", grid=False, format=".0f", tickCount=4))
+    line = alt.Chart(a).mark_line(color=_to_color("Missing"), strokeWidth=2.8,
+                                  point=alt.OverlayMarkDef(color=_to_color("Missing"), size=70, filled=True)
+                                  ).encode(x=x, y=yl)
+    line_lbl = alt.Chart(a).mark_text(dy=-13, color="#C4B5FD", fontSize=12, fontWeight="bold").encode(
+        x=x, y=alt.Y("Missing %:Q", scale=alt.Scale(domain=[-pc_top * 1.4, pc_top * 1.25]), axis=None),
+        text=alt.Text("pct_lbl:N")).transform_calculate(pct_lbl="format(datum['Missing %'], '.1f') + '%'")
+    chart = alt.layer(bars + bar_lbl, line + line_lbl).resolve_scale(y="independent")
+    st.altair_chart(_to_style(chart, height), use_container_width=True)
+
+
+def _to_metric_grid(agg, cfg, fmt):
+    if cfg.get("combo"):
+        _ws_combo_chart(agg, fmt)
+        return
+    ms = cfg.get("chart_metrics") or ((["Matches"] if cfg.get("match") else []) + cfg["metrics"])
+    if len(ms) == 1:
+        _to_metric_chart(agg, ms[0], fmt, height=260)
+        return
+    for i in range(0, len(ms), 2):
+        cols = st.columns(2)
+        for col, m in zip(cols, ms[i:i + 2]):
+            with col:
+                _to_metric_chart(agg, m, fmt)
 
 
 def _to_insights(agg, sel, cfg, unit):
@@ -1622,7 +1638,7 @@ def _render_tool_output(df, key, cfg):
                     "".join(f"<li>{i}</li>" for i in ins) + "</ul></div>", unsafe_allow_html=True)
 
     # ── Trends ────────────────────────────────────────────
-    _to_hdr("Volume & error rate — weekly", "bars = events reviewed · lines = error rate %")
+    _to_hdr("Weekly trend", cfg.get("chart_note", "one chart per metric · labels show the count"))
     weeks = list(wk.index)
     wk_view = wk
     if len(weeks) > 1:
@@ -1630,13 +1646,10 @@ def _render_tool_output(df, key, cfg):
                                value=(weeks[max(0, len(weeks) - _TO_WEEKS_DEFAULT)], weeks[-1]),
                                format_func=_wk_label, key=f"{key}_wrange")
         wk_view = wk.loc[rng[0]:rng[1]]
-    _to_trend(wk_view, cfg, _wk_label)
+    _to_metric_grid(wk_view, cfg, _wk_label)
 
-    _to_hdr("Volume & error rate — monthly")
-    _to_trend(mo, cfg, _mo_label)
-
-    _to_hdr("Every metric — monthly", "log scale so small counts stay visible")
-    _to_volume(mo, cfg, _mo_label)
+    _to_hdr("Monthly trend", cfg.get("chart_note", "one chart per metric · labels show the count"))
+    _to_metric_grid(mo, cfg, _mo_label)
 
     with st.expander("📋  Full numbers & rates"):
         t1, t2 = st.tabs(["Weekly", "Monthly"])
@@ -1680,17 +1693,18 @@ def _to_not_connected():
 
 _PR_CFG = dict(kicker="Tools Output · Collection quality", title="Player Review App",
                source="Player Review drive · Resolved folders",
-               metrics=["Events Reviewed", "Collector Wrong", "Both Wrong"],
-               errors=["Collector Wrong", "Both Wrong"], match=True, score="Collector accuracy")
+               metrics=["Events Reviewed", "Collector Wrong"],
+               errors=["Collector Wrong"], match=True, score="Collector accuracy")
 _SOFA_CFG = dict(kicker="Tools Output · Data comparison", title="Sofascore",
                  source="Archive Data/Resolved + New Resolved",
-                 metrics=["Events Reviewed", "SB Wrong", "Both Wrong"],
-                 errors=["SB Wrong", "Both Wrong"], match=True, score="SB accuracy")
+                 metrics=["Events Reviewed", "SB Wrong"],
+                 errors=["SB Wrong"], match=True, score="SB accuracy")
 _WS_EVENT_NAMES = {"Pass": "through_ball", "TakeOn": "Dribble", "Take_On": "Dribble"}
 _WS_METRICS = ["Events Reviewed", "Missing", "Already Added", "WS Wrong"]
 _WS_CFG = dict(kicker="Tools Output · Validation", title="WhoScored Validation",
                source="WhoScored sheet · Through-balls (reviewed rows)",
-               metrics=_WS_METRICS, errors=["Missing", "Already Added", "WS Wrong"], match=False)
+               metrics=_WS_METRICS, errors=["Missing", "Already Added", "WS Wrong"], match=False,
+               combo=True, chart_note="bars = events reviewed · line = Missing %")
 
 
 @_auto_refresh
@@ -1760,24 +1774,76 @@ def _ws_breakdown(df, dim, key):
                 f'<div class="xr-body" style="grid-template-columns:1fr"><div class="xr-kpis">{kpis}</div></div></div>',
                 unsafe_allow_html=True)
 
-    _to_hdr(f"Result mix by {dim.lower()}", "share of reviewed events · labels show %")
+    _to_hdr(f"Results by {dim.lower()}", "event counts")
     res = _WS_METRICS[1:]
-    p = t[res].div(t["Events Reviewed"].where(t["Events Reviewed"] != 0), axis=0).mul(100).round(1)
-    long = p.reset_index().melt(id_vars=[dim], var_name="Result", value_name="pct")
+    long = t[res].reset_index().melt(id_vars=[dim], var_name="Result", value_name="Events")
+    long["Result"] = pd.Categorical(long["Result"], categories=res, ordered=True)
+    long = long.sort_values([dim, "Result"])
+    long["share"] = long.groupby(dim)["Events"].transform(lambda s: s / (s.sum() or 1))
+    long["mid"] = long.groupby(dim)["Events"].cumsum() - long["Events"] / 2
+    long["end"] = long.groupby(dim)["Events"].transform("sum")
+    long["Result"] = long["Result"].astype(str)
     y = alt.Y(f"{dim}:N", sort=list(t.index), title=None, axis=alt.Axis(labelLimit=240))
     color = alt.Color("Result:N", sort=res, scale=alt.Scale(domain=res, range=[_to_color(m) for m in res]))
-    bars = alt.Chart(long).mark_bar(height=20).encode(
-        y=y, x=alt.X("pct:Q", stack="zero", title="% of reviewed", scale=alt.Scale(domain=[0, 100])),
-        color=color, order=alt.Order("Result:N"),
-        tooltip=[dim, "Result", alt.Tooltip("pct:Q", format=".1f", title="%")])
-    lbl = alt.Chart(long).transform_filter("datum.pct >= 6").mark_text(
-        color="#0b1220", fontSize=11, fontWeight="bold", dx=-4, align="right").encode(
-        y=y, x=alt.X("pct:Q", stack="zero"), order=alt.Order("Result:N"),
-        detail="Result:N", text=alt.Text("pct:Q", format=".0f"))
-    st.altair_chart(_to_style(bars + lbl, max(200, 34 * len(t))), use_container_width=True)
+    order = alt.Order("Result:N")
+    bars = alt.Chart(long).mark_bar(height=22).encode(
+        y=y, x=alt.X("Events:Q", stack="zero", title="Events", axis=alt.Axis(format="~s"),
+                     scale=alt.Scale(domain=[0, float(long["end"].max()) * 1.1])),
+        color=color, order=order, tooltip=[dim, "Result", alt.Tooltip("Events:Q", format=",")])
+    lbl = alt.Chart(long).transform_filter("datum.share >= 0.12").mark_text(
+        color="#0b1220", fontSize=11, fontWeight="bold").encode(
+        y=y, x=alt.X("mid:Q"), detail="Result:N", text=alt.Text("Events:Q", format=",.0f"))
+    ends = long.drop_duplicates(dim)[[dim, "end"]]
+    tot_lbl = alt.Chart(ends).mark_text(align="left", dx=6, color="#CBD5E1", fontSize=11).encode(
+        y=y, x=alt.X("end:Q"), text=alt.Text("end:Q", format=",.0f"))
+    st.altair_chart(_to_style(bars + lbl + tot_lbl, max(200, 36 * len(t))), use_container_width=True)
 
     _to_hdr("Ranking", "sorted by events reviewed")
     _ws_rank_table(t, dim)
+
+
+def _ws_event_table(agg, fmt):
+    t = agg.copy()
+    base = t["Events Reviewed"].where(t["Events Reviewed"] != 0)
+    for m in ["Missing", "Already Added", "WS Wrong"]:
+        t[f"{m} %"] = (t[m] / base * 100).round(2)
+    t = t[["Events Reviewed", "Missing", "Missing %", "Already Added", "Already Added %",
+           "WS Wrong", "WS Wrong %"]]
+    t.index = [fmt(i) for i in t.index]
+    t.index.name = "Period"
+    st.dataframe(t.iloc[::-1], use_container_width=True,
+                 column_config={c: st.column_config.NumberColumn(format="%.2f%%")
+                                for c in t.columns if c.endswith("%")})
+
+
+def _ws_per_event(df, key):
+    """For every event: Missing chart (weekly + monthly) and weekly / monthly table."""
+    st.markdown('<div class="xr-h" style="margin-top:34px"><b>Missing by event</b>'
+                '<span>one block per event · weekly & monthly</span></div>', unsafe_allow_html=True)
+    weeks_all = sorted(df["week"].unique())
+    n_weeks = st.slider("Weeks shown in event charts", 1, max(1, len(weeks_all)),
+                        min(_TO_WEEKS_DEFAULT, max(1, len(weeks_all))), key=f"{key}_evw")
+    events = (df.groupby("Event")["Events Reviewed"].sum().sort_values(ascending=False).index)
+    for ev in events:
+        sub = df[df["Event"] == ev]
+        wk = _to_agg(sub, "week", _WS_METRICS, None)
+        mo = _to_agg(sub, "month", _WS_METRICS, None)
+        tot_r, tot_m = int(sub["Events Reviewed"].sum()), int(sub["Missing"].sum())
+        rate = f"{tot_m / tot_r * 100:.2f}%" if tot_r else "–"
+        with st.container(border=True):
+            st.markdown(f'<div class="xr-h" style="margin:4px 0 6px"><b>{ev}</b>'
+                        f'<span>{tot_m:,} missing of {tot_r:,} reviewed · {rate}</span></div>',
+                        unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                _ws_combo_chart(wk.iloc[-n_weeks:], _wk_label, height=240)
+            with c2:
+                _ws_combo_chart(mo, _mo_label, height=240)
+            tw, tm = st.tabs(["Weekly table", "Monthly table"])
+            with tw:
+                _ws_event_table(wk, _wk_label)
+            with tm:
+                _ws_event_table(mo, _mo_label)
 
 
 @_auto_refresh
@@ -1792,6 +1858,7 @@ def render_ws_output():
     t1, t2, t3 = st.tabs(["Overview", "By Event", "By Competition"])
     with t1:
         _render_tool_output(df, "ws_all", _WS_CFG)
+        _ws_per_event(df, "ws_pe")
     with t2:
         ev = st.selectbox("Event", ["All events (compare)"] + sorted(df["Event"].unique()), key="ws_ev")
         if ev.startswith("All events"):
