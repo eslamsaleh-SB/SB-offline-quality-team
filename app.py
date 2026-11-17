@@ -237,6 +237,98 @@ button[kind="headerNoPadding"] {
     color: #9aa6b5 !important;
     font-weight: 300;
 }
+
+/* ======================= UI polish (v2) ======================= */
+:root {
+    --bg:#0e1117; --surface:#151a23; --surface-2:#1b212c; --border:#262d3a;
+    --border-soft:#1f2530; --text:#f4f6fa; --muted:#93a0b2; --muted-2:#6b778a;
+    --accent:#68A4C4; --accent-soft:rgba(104,164,196,.14);
+    --good:#6FCF97; --bad:#EB8C87; --warn:#F2C94C; --violet:#B58BD8;
+    --radius:14px;
+}
+.block-container { max-width: 1240px !important; padding: 2.2rem 2.6rem 3rem !important; }
+
+/* Active nav item (primary button in the sidebar) */
+[data-testid="stSidebar"] .stButton button[kind="primary"] {
+    background: var(--accent-soft) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    box-shadow: inset 3px 0 0 var(--accent) !important;
+    border: none !important;
+}
+[data-testid="stSidebar"] .stButton button[kind="primary"] * { color:#ffffff !important; }
+
+/* Main-area buttons */
+.main .stButton button, [data-testid="stMain"] .stButton button {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; font-weight: 500; transition: all .15s ease;
+}
+[data-testid="stMain"] .stButton button:hover { border-color: var(--accent); color:#fff; }
+
+/* Tabs → clean underline style */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.2rem;
+}
+[data-testid="stTabs"] [data-baseweb="tab"] {
+    background: transparent; padding: .65rem 1.1rem; border-radius: 10px 10px 0 0;
+    color: var(--muted) !important; font-weight: 500;
+}
+[data-testid="stTabs"] [data-baseweb="tab"] p { color: inherit !important; font-size: .95rem; }
+[data-testid="stTabs"] [aria-selected="true"] { color: #ffffff !important; background: var(--surface); }
+[data-testid="stTabs"] [data-baseweb="tab-highlight"] { background-color: var(--accent) !important; height: 2px; }
+[data-testid="stTabs"] [data-baseweb="tab-border"] { display: none; }
+
+/* Inputs */
+[data-baseweb="select"] > div, [data-baseweb="input"] > div {
+    background: var(--surface) !important; border-color: var(--border) !important; border-radius: 10px !important;
+}
+[data-testid="stWidgetLabel"] p { color: var(--muted) !important; font-size: .78rem !important;
+    font-weight: 600 !important; letter-spacing: .06em; text-transform: uppercase; }
+
+/* Native metrics (other dashboards) as cards */
+[data-testid="stMetric"] {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+}
+[data-testid="stMetricLabel"] p { color: var(--muted) !important; font-size: .8rem !important; }
+
+/* Expanders, dataframes, dividers */
+[data-testid="stMain"] [data-testid="stExpander"] {
+    background: var(--surface); border: 1px solid var(--border) !important; border-radius: var(--radius);
+}
+[data-testid="stDataFrame"] { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+hr { border-color: var(--border) !important; }
+[data-testid="stVegaLiteChart"] { background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: .9rem .9rem .4rem; }
+[data-testid="stCaptionContainer"] p { color: var(--muted-2) !important; }
+
+/* ---------- Tools Output components ---------- */
+.to-head { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem;
+    margin: .2rem 0 1rem; flex-wrap: wrap; }
+.to-head h3 { font-family:'DM Serif Display',serif; font-weight:400; font-size:1.6rem;
+    margin:0; color:var(--text) !important; letter-spacing:-.01em; }
+.to-head .src { color: var(--muted-2); font-size:.8rem; }
+.to-head .src b { color: var(--muted); font-weight:500; }
+.to-section { display:flex; align-items:center; gap:.6rem; margin: 1.6rem 0 .7rem; }
+.to-section .t { font-size:.74rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color: var(--muted); }
+.to-section .p { font-size:.78rem; color: var(--accent); background: var(--accent-soft);
+    padding:.15rem .6rem; border-radius:999px; font-weight:600; }
+.to-section .line { flex:1; height:1px; background: var(--border-soft); }
+.to-grid { display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.to-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.1rem .9rem; position:relative; overflow:hidden; }
+.to-card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--c, var(--accent)); }
+.to-card .l { font-size:.74rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); }
+.to-card .v { font-size:1.9rem; font-weight:700; color: var(--text); margin:.25rem 0 .35rem;
+    font-variant-numeric: tabular-nums; letter-spacing:-.02em; }
+.to-card .f { display:flex; gap:.45rem; align-items:center; flex-wrap:wrap; font-size:.76rem; color: var(--muted-2); }
+.to-chip { padding:.1rem .5rem; border-radius:999px; font-weight:600; font-size:.72rem; }
+.to-chip.up-good, .to-chip.down-good { background: rgba(111,207,151,.13); color: var(--good); }
+.to-chip.up-bad, .to-chip.down-bad { background: rgba(235,140,135,.13); color: var(--bad); }
+.to-chip.flat { background: var(--surface-2); color: var(--muted); }
+.to-rate { color: var(--muted); }
+@media (max-width: 700px) { .block-container { padding: 1.2rem 1rem 2rem !important; } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -247,6 +339,11 @@ if "page" not in st.session_state:
 
 def go_to(page_name):
     st.session_state.page = page_name
+
+
+def _nav_type(page_name):
+    """Highlight the current page in the sidebar."""
+    return "primary" if st.session_state.get("page") == page_name else "secondary"
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -269,39 +366,39 @@ with st.sidebar:
 
     # -- Overview (main navigation item) --
     st.button("🏠  Overview", key="nav_overview",
-              use_container_width=True, on_click=go_to, args=("Overview",))
+              use_container_width=True, type=_nav_type("Overview"), on_click=go_to, args=("Overview",))
 
     # -- Team Productivity (live dashboard — top-level item) --
     st.button("📊  Team Productivity", key="nav_team_productivity",
-              use_container_width=True, on_click=go_to, args=("Team Productivity",))
+              use_container_width=True, type=_nav_type("Team Productivity"), on_click=go_to, args=("Team Productivity",))
 
     # -- Customer Complaints (live dashboard — top-level item) --
     st.button("🗒️  Customer Complaints", key="nav_customer_complaints",
-              use_container_width=True, on_click=go_to, args=("Customer Complaints",))
+              use_container_width=True, type=_nav_type("Customer Complaints"), on_click=go_to, args=("Customer Complaints",))
 
     st.button("🎯  Quality Score", key="nav_quality_score",
-              use_container_width=True, on_click=go_to, args=("Quality Score",))
+              use_container_width=True, type=_nav_type("Quality Score"), on_click=go_to, args=("Quality Score",))
 
     st.button("🧰  Tools Output", key="nav_tools_output",
-              use_container_width=True, on_click=go_to, args=("Tools Output",))
+              use_container_width=True, type=_nav_type("Tools Output"), on_click=go_to, args=("Tools Output",))
 
     # -- "Review Processes" dropdown --
     with st.expander("🔍  Review Processes", expanded=True):
         st.button("A Review", key="nav_a_review",
-                  use_container_width=True, on_click=go_to, args=("A Review",))
+                  use_container_width=True, type=_nav_type("A Review"), on_click=go_to, args=("A Review",))
         st.button("Hypercare Review", key="nav_hypercare_review",
-                  use_container_width=True, on_click=go_to, args=("Hypercare Review",))
+                  use_container_width=True, type=_nav_type("Hypercare Review"), on_click=go_to, args=("Hypercare Review",))
         st.button("Player Review", key="nav_player_review",
-                  use_container_width=True, on_click=go_to, args=("Player Review",))
+                  use_container_width=True, type=_nav_type("Player Review"), on_click=go_to, args=("Player Review",))
         st.button("Sofascore Comparison Tool", key="nav_sofascore",
-                  use_container_width=True, on_click=go_to, args=("Sofascore Comparison Tool",))
+                  use_container_width=True, type=_nav_type("Sofascore Comparison Tool"), on_click=go_to, args=("Sofascore Comparison Tool",))
 
     # -- "Distribution Processes" dropdown --
     with st.expander("📦  Distribution Processes", expanded=True):
         st.button("Automated Match Extraction", key="nav_auto_extraction",
-                  use_container_width=True, on_click=go_to, args=("Automated Match Extraction",))
+                  use_container_width=True, type=_nav_type("Automated Match Extraction"), on_click=go_to, args=("Automated Match Extraction",))
         st.button("Automated Match Distribution", key="nav_auto_distribution",
-                  use_container_width=True, on_click=go_to, args=("Automated Match Distribution",))
+                  use_container_width=True, type=_nav_type("Automated Match Distribution"), on_click=go_to, args=("Automated Match Distribution",))
 
 # ── Helper: standalone per-page header ────────────────────────────────────────
 def render_page_header(eyebrow, title, subtitle=""):
@@ -1286,46 +1383,95 @@ def _to_agg(df, by, metrics, match_col):
     return out.sort_index()
 
 
-def _to_cards(title, agg, sel, cols, base):
-    """One row of KPI cards for the selected period, with delta vs the previous one."""
-    st.markdown(f"##### {title}")
+# Semantic colours per metric (same everywhere: cards, charts, tables)
+_TO_COLORS = {
+    "Matches": "#93a0b2",
+    "Events Reviewed": "#68A4C4",
+    "Collector Wrong": "#EB8C87",
+    "SB Wrong": "#EB8C87",
+    "WS Wrong": "#EB8C87",
+    "Both Wrong": "#F2C94C",
+    "Missing": "#B58BD8",
+    "Already Added": "#6FCF97",
+}
+
+
+def _to_color(m):
+    return _TO_COLORS.get(m, "#68A4C4")
+
+
+def _to_style(chart, height):
+    """Dark, quiet chart styling shared by every Tools Output chart."""
+    return (chart.properties(height=height, background="transparent")
+            .configure_view(strokeWidth=0)
+            .configure_axis(labelColor="#93a0b2", titleColor="#6b778a", gridColor="#1f2530",
+                            domainColor="#262d3a", tickColor="#262d3a", labelFontSize=11,
+                            titleFontSize=11, titleFontWeight="normal")
+            .configure_legend(labelColor="#c9d1dc", labelFontSize=12, symbolType="circle",
+                              orient="top", title=None, padding=0, offset=14)
+            .configure_title(color="#f4f6fa"))
+
+
+def _to_section(title, pill=""):
+    pill_html = f'<span class="p">{pill}</span>' if pill else ""
+    st.markdown(f'<div class="to-section"><span class="t">{title}</span>{pill_html}'
+                f'<span class="line"></span></div>', unsafe_allow_html=True)
+
+
+def _to_cards(agg, sel, cols, base, prev_label):
+    """KPI cards for the selected period, with change vs the previous period."""
     idx = list(agg.index)
     row = agg.loc[sel]
-    prev = agg.loc[idx[idx.index(sel) - 1]] if idx.index(sel) > 0 else None
-    boxes = st.columns(len(cols))
-    for box, c in zip(boxes, cols):
+    pos = idx.index(sel)
+    prev = agg.loc[idx[pos - 1]] if pos > 0 else None
+    html = ['<div class="to-grid">']
+    for c in cols:
         val = int(row[c])
-        delta = None if prev is None else f"{val - int(prev[c]):+,}"
         is_err = c not in ("Matches", base)
-        with box:
-            st.metric(c, f"{val:,}", delta=delta,
-                      delta_color="inverse" if is_err else "normal")
-            if is_err and row[base]:
-                st.caption(f"{val / row[base] * 100:.2f}% of reviewed")
+        foot = []
+        if prev is not None:
+            d = val - int(prev[c])
+            if d == 0:
+                foot.append('<span class="to-chip flat">0</span>')
+            else:
+                good = (d < 0) if is_err else (d > 0)
+                cls = ("up-" if d > 0 else "down-") + ("good" if good else "bad")
+                arrow = "▲" if d > 0 else "▼"
+                foot.append(f'<span class="to-chip {cls}">{arrow} {abs(d):,}</span>')
+            foot.append(f"vs {prev_label}")
+        if is_err and row[base]:
+            foot.append(f'<span class="to-rate">· {val / row[base] * 100:.2f}% of reviewed</span>')
+        html.append(f'<div class="to-card" style="--c:{_to_color(c)}"><div class="l">{c}</div>'
+                    f'<div class="v">{val:,}</div><div class="f">{"".join(foot) or "&nbsp;"}</div></div>')
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
 
 
-def _to_chart(agg, metrics, match_col, fmt, height=300):
+def _to_chart(agg, metrics, match_col, fmt, height=320):
     a = agg.reset_index()
-    pcol = a.columns[0]
-    a["label"] = a[pcol].map(fmt)
+    a["label"] = a[a.columns[0]].map(fmt)
     order = list(a["label"])
     long = a.melt(id_vars=["label"], value_vars=metrics, var_name="Metric", value_name="Count")
-    bars = alt.Chart(long).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
-        x=alt.X("label:N", sort=order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=160)),
+    bars = alt.Chart(long).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
+        x=alt.X("label:N", sort=order, title=None,
+                axis=alt.Axis(labelAngle=0, labelLimit=140, labelPadding=8)),
         xOffset=alt.XOffset("Metric:N", sort=metrics),
-        y=alt.Y("Count:Q", title="Events", axis=alt.Axis(format="d")),
-        color=alt.Color("Metric:N", scale=alt.Scale(domain=metrics, range=_CAT_COLORS[:len(metrics)]),
-                        legend=alt.Legend(title=None, orient="top")),
+        y=alt.Y("Count:Q", title="Events", axis=alt.Axis(format="~s", tickCount=5)),
+        color=alt.Color("Metric:N", sort=metrics,
+                        scale=alt.Scale(domain=metrics, range=[_to_color(m) for m in metrics])),
         tooltip=[alt.Tooltip("label:N", title="Period"), "Metric",
                  alt.Tooltip("Count:Q", format=",")])
     chart = bars
     if match_col:
-        line = alt.Chart(a).mark_line(point=True, color="#fafafa", strokeDash=[4, 3]).encode(
-            x=alt.X("label:N", sort=order),
-            y=alt.Y("Matches:Q", title="Matches (dashed)", axis=alt.Axis(format="d", orient="right")),
+        base = alt.Chart(a).encode(x=alt.X("label:N", sort=order))
+        line = base.mark_line(color="#c9d1dc", strokeWidth=1.6, strokeDash=[4, 3]).encode(
+            y=alt.Y("Matches:Q", title="Matches", axis=alt.Axis(format="d", orient="right",
+                                                                 grid=False, tickCount=5)))
+        pts = base.mark_circle(color="#c9d1dc", size=46).encode(
+            y=alt.Y("Matches:Q", axis=None),
             tooltip=[alt.Tooltip("label:N", title="Period"), alt.Tooltip("Matches:Q", format=",")])
-        chart = alt.layer(bars, line).resolve_scale(y="independent")
-    st.altair_chart(chart.properties(height=height), use_container_width=True)
+        chart = alt.layer(bars, line + pts).resolve_scale(y="independent")
+    st.altair_chart(_to_style(chart, height), use_container_width=True)
 
 
 def _to_rates_table(agg, metrics, fmt):
@@ -1334,12 +1480,14 @@ def _to_rates_table(agg, metrics, fmt):
     for m in metrics[1:]:
         t[f"{m} %"] = (t[m] / t[base].where(t[base] != 0) * 100).round(2)
     t.index = [fmt(i) for i in t.index]
-    t = t.iloc[::-1]
-    st.dataframe(t, use_container_width=True)
+    t.index.name = "Period"
+    st.dataframe(t.iloc[::-1], use_container_width=True,
+                 column_config={c: st.column_config.NumberColumn(format="%.2f%%")
+                                for c in t.columns if c.endswith("%")})
 
 
 def _render_tool_output(df, key, metrics, match_col=None):
-    """Cards (week + month), weekly chart with week-range filter, monthly chart."""
+    """Period pickers → KPI cards (week + month) → weekly & monthly trends."""
     if df.empty:
         st.info("No reviewed data for this selection yet.")
         return
@@ -1347,41 +1495,50 @@ def _render_tool_output(df, key, metrics, match_col=None):
     wk = _to_agg(df, "week", metrics, match_col)
     mo = _to_agg(df, "month", metrics, match_col)
 
-    c1, c2 = st.columns(2)
-    weeks_desc = list(wk.index)[::-1]
-    months_desc = list(mo.index)[::-1]
-    sel_w = c1.selectbox("Week (Sun – Sat)", weeks_desc, format_func=_wk_label, key=f"{key}_wsel")
-    sel_m = c2.selectbox("Month", months_desc, format_func=_mo_label, key=f"{key}_msel")
+    c1, c2, _sp = st.columns([1.2, 1, 1.3])
+    sel_w = c1.selectbox("Week (Sun – Sat)", list(wk.index)[::-1], format_func=_wk_label,
+                         key=f"{key}_wsel")
+    sel_m = c2.selectbox("Month", list(mo.index)[::-1], format_func=_mo_label, key=f"{key}_msel")
 
-    _to_cards(f"Week · {_wk_label(sel_w)}", wk, sel_w, cols, metrics[0])
-    _to_cards(f"Month · {_mo_label(sel_m)}", mo, sel_m, cols, metrics[0])
-    st.divider()
+    _to_section("This week", _wk_label(sel_w))
+    _to_cards(wk, sel_w, cols, metrics[0], "previous week")
+    _to_section("This month", _mo_label(sel_m))
+    _to_cards(mo, sel_m, cols, metrics[0], "previous month")
 
-    st.markdown("##### Weekly trend")
+    _to_section("Weekly trend")
     weeks = list(wk.index)
+    wk_view = wk
     if len(weeks) > 1:
         start_default = weeks[max(0, len(weeks) - _TO_WEEKS_DEFAULT)]
-        rng = st.select_slider("Weeks shown (default: last 6)", options=weeks,
+        rng = st.select_slider("Weeks shown — drag to see more (default: last 6)", options=weeks,
                                value=(start_default, weeks[-1]), format_func=_wk_label,
                                key=f"{key}_wrange")
         wk_view = wk.loc[rng[0]:rng[1]]
-    else:
-        wk_view = wk
     _to_chart(wk_view, metrics, match_col, _wk_label)
 
-    st.markdown("##### Monthly trend")
+    _to_section("Monthly trend")
     _to_chart(mo, metrics, match_col, _mo_label)
 
-    with st.expander("Numbers & rates"):
-        st.markdown("**Weekly**")
-        _to_rates_table(wk, metrics, _wk_label)
-        st.markdown("**Monthly**")
-        _to_rates_table(mo, metrics, _mo_label)
+    with st.expander("📋  Numbers & rates"):
+        w, m = st.tabs(["Weekly", "Monthly"])
+        with w:
+            _to_rates_table(wk, metrics, _wk_label)
+        with m:
+            _to_rates_table(mo, metrics, _mo_label)
 
 
-def _to_refresh(key, loader):
-    if st.button("🔄 Refresh", key=f"{key}_refresh"):
-        loader.clear()
+def _to_header(title, source, loader, key, fetched_at=None):
+    c1, c2 = st.columns([5, 1])
+    upd = f" · updated <b>{fetched_at.strftime('%b %d, %I:%M %p')}</b>" if fetched_at else ""
+    c1.markdown(f'<div class="to-head"><div><h3>{title}</h3>'
+                f'<div class="src">{source} · weeks run Sunday → Saturday by '
+                f'<b>collection completion date</b>{upd}</div></div></div>',
+                unsafe_allow_html=True)
+    with c2:
+        st.markdown("<div style='height:1.1rem'></div>", unsafe_allow_html=True)
+        if st.button("↻  Refresh", key=f"{key}_refresh", use_container_width=True):
+            loader.clear()
+            st.rerun()
 
 
 def _to_load(loader, label):
@@ -1394,34 +1551,36 @@ def _to_load(loader, label):
         return None
 
 
+def _to_not_connected():
+    if _to_configured():
+        return False
+    st.info("Tools Output isn't connected yet. Add the service account to Streamlit "
+            "Secrets (see `apps_script/README.md`).")
+    return True
+
+
 @_auto_refresh
 def render_pr_output():
-    if not _to_configured():
-        st.info("Tools Output isn't connected yet. Add the service account and sheet IDs to "
-                "`.streamlit/secrets.toml` (see `apps_script/README.md`).")
+    if _to_not_connected():
         return
-    _to_refresh("pr", load_pr_output)
     data = _to_load(load_pr_output, "PR_Summary")
     if data is None:
         return
-    st.caption(f"Source: Player Review drive (Resolved folders) · week = collection completion date · "
-               f"updated {data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    _to_header("Player Review App", "Player Review drive · Resolved folders",
+               load_pr_output, "pr", data["fetched_at"])
     _render_tool_output(data["df"], "pr", ["Events Reviewed", "Collector Wrong", "Both Wrong"],
                         match_col="Matches")
 
 
 @_auto_refresh
 def render_sofa_output():
-    if not _to_configured():
-        st.info("Tools Output isn't connected yet. Add the service account and sheet IDs to "
-                "`.streamlit/secrets.toml` (see `apps_script/README.md`).")
+    if _to_not_connected():
         return
-    _to_refresh("sofa", load_sofa_output)
     data = _to_load(load_sofa_output, "Sofa_Summary")
     if data is None:
         return
-    st.caption(f"Source: resolved batches (Archive/Resolved + New Resolved) · week = "
-               f"collection completion date · updated {data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    _to_header("Sofascore", "Archive Data/Resolved + New Resolved", load_sofa_output, "sofa",
+               data["fetched_at"])
     _render_tool_output(data["df"], "sofa", ["Events Reviewed", "SB Wrong", "Both Wrong"],
                         match_col="Matches")
 
@@ -1431,68 +1590,79 @@ _WS_METRICS = ["Events Reviewed", "Missing", "Already Added", "WS Wrong"]
 
 
 def _ws_breakdown(df, dim, key):
-    """Table + stacked bar of a dimension (Event / Competition) for a chosen period."""
-    c1, c2 = st.columns([1, 2])
+    """Compare every Event / Competition for one period."""
+    c1, c2, _sp = st.columns([1.2, 1.2, 1.1])
     scope = c1.radio("Period", ["Week", "Month", "All time"], horizontal=True, key=f"{key}_scope")
-    sub = df
+    sub, pill = df, "All time"
     if scope == "Week":
         opts = sorted(df["week"].unique(), reverse=True)
         sel = c2.selectbox("Week", opts, format_func=lambda t: _wk_label(pd.Timestamp(t)),
                            key=f"{key}_bw")
-        sub = df[df["week"] == sel]
+        sub, pill = df[df["week"] == sel], _wk_label(pd.Timestamp(sel))
     elif scope == "Month":
         opts = sorted(df["month"].unique(), reverse=True)
         sel = c2.selectbox("Month", opts, format_func=lambda t: _mo_label(pd.Timestamp(t)),
                            key=f"{key}_bm")
-        sub = df[df["month"] == sel]
+        sub, pill = df[df["month"] == sel], _mo_label(pd.Timestamp(sel))
     t = sub.groupby(dim)[_WS_METRICS].sum().sort_values("Events Reviewed", ascending=False)
     if t.empty:
         st.info("Nothing reviewed in this period.")
         return
-    long = t[_WS_METRICS[1:]].reset_index().melt(id_vars=[dim], var_name="Result", value_name="Events")
-    st.altair_chart(
-        alt.Chart(long).mark_bar().encode(
-            y=alt.Y(f"{dim}:N", sort=list(t.index), title=None, axis=alt.Axis(labelLimit=260)),
-            x=alt.X("Events:Q", stack="zero", axis=alt.Axis(format="d")),
-            color=alt.Color("Result:N", scale=alt.Scale(domain=_WS_METRICS[1:],
-                                                        range=_CAT_COLORS[1:4]),
-                            legend=alt.Legend(title=None, orient="top")),
-            tooltip=[dim, "Result", alt.Tooltip("Events:Q", format=",")])
-        .properties(height=max(180, 30 * len(t))),
-        use_container_width=True,
-    )
+
+    _to_section("Totals", pill)
+    tot = t.sum()
+    html = ['<div class="to-grid">']
+    for m in _WS_METRICS:
+        rate = (f'<span class="to-rate">{tot[m] / tot["Events Reviewed"] * 100:.2f}% of reviewed</span>'
+                if m != "Events Reviewed" and tot["Events Reviewed"] else "&nbsp;")
+        html.append(f'<div class="to-card" style="--c:{_to_color(m)}"><div class="l">{m}</div>'
+                    f'<div class="v">{int(tot[m]):,}</div><div class="f">{rate}</div></div>')
+    st.markdown("".join(html + ["</div>"]), unsafe_allow_html=True)
+
+    _to_section(f"By {dim.lower()}", pill)
+    res = _WS_METRICS[1:]
+    long = t[res].reset_index().melt(id_vars=[dim], var_name="Result", value_name="Events")
+    chart = alt.Chart(long).mark_bar(cornerRadiusEnd=3).encode(
+        y=alt.Y(f"{dim}:N", sort=list(t.index), title=None, axis=alt.Axis(labelLimit=260)),
+        x=alt.X("Events:Q", stack="zero", title="Events", axis=alt.Axis(format="~s")),
+        color=alt.Color("Result:N", sort=res,
+                        scale=alt.Scale(domain=res, range=[_to_color(m) for m in res])),
+        tooltip=[dim, "Result", alt.Tooltip("Events:Q", format=",")])
+    st.altair_chart(_to_style(chart, max(200, 34 * len(t))), use_container_width=True)
+
     out = t.copy()
-    for m in _WS_METRICS[1:]:
+    for m in res:
         out[f"{m} %"] = (out[m] / out["Events Reviewed"] * 100).round(2)
-    st.dataframe(out, use_container_width=True)
+    st.dataframe(out, use_container_width=True,
+                 column_config={c: st.column_config.NumberColumn(format="%.2f%%")
+                                for c in out.columns if c.endswith("%")})
 
 
 @_auto_refresh
 def render_ws_output():
-    if not _to_configured():
-        st.info("Tools Output isn't connected yet. Add the service account and sheet IDs to "
-                "`.streamlit/secrets.toml` (see `apps_script/README.md`).")
+    if _to_not_connected():
         return
-    _to_refresh("ws", load_ws_output)
     data = _to_load(load_ws_output, "WS_Summary")
     if data is None:
         return
     df = data["df"]
-    st.caption(f"Source: WhoScored sheet (Through-balls, reviewed rows) · week = "
-               f"collection completion date · updated {data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    _to_header("WhoScored Validation", "WhoScored sheet · Through-balls (reviewed rows)",
+               load_ws_output, "ws", data["fetched_at"])
     t1, t2, t3 = st.tabs(["Overview", "By Event", "By Competition"])
     with t1:
         _render_tool_output(df, "ws_all", _WS_METRICS)
     with t2:
-        ev = st.selectbox("Event", ["All events"] + sorted(df["Event"].unique()), key="ws_ev")
-        if ev == "All events":
+        ev = st.selectbox("Event", ["All events (compare)"] + sorted(df["Event"].unique()),
+                          key="ws_ev")
+        if ev.startswith("All events"):
             _ws_breakdown(df, "Event", "ws_evb")
         else:
             _render_tool_output(df[df["Event"] == ev], f"ws_ev_{ev}", _WS_METRICS)
     with t3:
-        comp = st.selectbox("Competition", ["All competitions"] + sorted(df["Competition"].unique()),
+        comp = st.selectbox("Competition",
+                            ["All competitions (compare)"] + sorted(df["Competition"].unique()),
                             key="ws_comp")
-        if comp == "All competitions":
+        if comp.startswith("All competitions"):
             _ws_breakdown(df, "Competition", "ws_cb")
         else:
             _render_tool_output(df[df["Competition"] == comp], f"ws_c_{comp}", _WS_METRICS)
@@ -1967,7 +2137,7 @@ elif page == "Tools Output":
         "Review output from the Player Review App, the Sofascore comparison tool and "
         "WhoScored validation. Weeks run Sunday to Saturday. Refreshes every 5 minutes.",
     )
-    _pr_tab, _sofa_tab, _ws_tab = st.tabs(["Player Review App", "Sofascore", "WhoScored Validation"])
+    _pr_tab, _sofa_tab, _ws_tab = st.tabs(["🎥  Player Review App", "⚽  Sofascore", "✅  WhoScored Validation"])
     with _pr_tab:
         render_pr_output()
     with _sofa_tab:
