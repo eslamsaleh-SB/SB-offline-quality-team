@@ -1,6 +1,7 @@
 import os
 import re
 from datetime import datetime
+from urllib.parse import quote
 
 import altair as alt
 import pandas as pd
@@ -280,6 +281,9 @@ with st.sidebar:
 
     st.button("🎯  Quality Score", key="nav_quality_score",
               use_container_width=True, on_click=go_to, args=("Quality Score",))
+
+    st.button("🧰  Tools Output", key="nav_tools_output",
+              use_container_width=True, on_click=go_to, args=("Tools Output",))
 
     # -- "Review Processes" dropdown --
     with st.expander("🔍  Review Processes", expanded=True):
@@ -1156,6 +1160,344 @@ def render_quality_score():
             st.caption("collector_score (%) by module and period.")
 
 
+# ── Tools Output (Player Review App · Sofascore · WhoScored Validation) ──────
+# Every section reads a Google Sheet as public CSV (same pattern as the other
+# live dashboards). Sheets must be shared "anyone with the link can view".
+# The Apps Scripts (apps_script/1_PlayerReview.gs, 2_Sofascore.gs, 3_WhoScored.gs)
+# write the tabs PR_Summary / Sofa_Summary / WS_Summary. The site reads them with a
+# Google service account (the sheets are shared with its e-mail as Viewer).
+# Config lives in .streamlit/secrets.toml — see apps_script/README.md.
+_TO_WEEKS_DEFAULT = 6
+_TO_SHEET_KEYS = {"PR_Summary": "pr_sheet_id", "Sofa_Summary": "sofa_sheet_id",
+                  "WS_Summary": "ws_sheet_id"}
+
+
+def _to_secrets():
+    try:
+        return st.secrets
+    except Exception:  # noqa: BLE001 — no secrets.toml
+        return {}
+
+
+_TO_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "service account.json")
+
+
+_TO_HUB_SHEET_ID = "1npyRK-hWRVC1rie9MNDP2cHs17zUMMW8qLJUAGpMMYA"   # "Tools Documentation"
+
+
+def _to_sheet_ids():
+    ids = {k: _TO_HUB_SHEET_ID for k in _TO_SHEET_KEYS.values()}
+    s = _to_secrets()
+    if "tools_output" in s:
+        ids.update({k: v for k, v in dict(s["tools_output"]).items() if v})
+    return ids
+
+
+def _to_configured():
+    has_key = "gcp_service_account" in _to_secrets() or os.path.exists(_TO_KEY_FILE)
+    return has_key and bool(_to_sheet_ids())
+
+
+@st.cache_resource(show_spinner=False)
+def _to_client():
+    import gspread
+    s = _to_secrets()
+    if "gcp_service_account" in s:
+        return gspread.service_account_from_dict(dict(s["gcp_service_account"]))
+    return gspread.service_account(filename=_TO_KEY_FILE)
+
+
+def _to_read(tab):
+    sheet_id = _to_sheet_ids().get(_TO_SHEET_KEYS[tab], "")
+    if not sheet_id:
+        raise RuntimeError(f"{_TO_SHEET_KEYS[tab]} is missing in secrets.toml [tools_output]")
+    values = _to_client().open_by_key(sheet_id).worksheet(tab).get_all_values()
+    if not values:
+        return pd.DataFrame()
+    df = pd.DataFrame(values[1:], columns=[str(c).strip().lower() for c in values[0]])
+    return df
+
+
+def _add_periods(df, col):
+    """Add date / week (starts Sunday) / month columns from a date column."""
+    df = df.copy()
+    df["date"] = pd.to_datetime(df[col], errors="coerce")
+    df = df.dropna(subset=["date"])
+    df["date"] = df["date"].dt.normalize()
+    df["week"] = df["date"] - pd.to_timedelta((df["date"].dt.weekday + 1) % 7, unit="D")
+    df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
+    return df
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_pr_output():
+    raw = _to_read("PR_Summary")
+    df = pd.DataFrame({
+        "Matches": raw["matches"].map(_to_num),
+        "Events Reviewed": raw["events_reviewed"].map(_to_num),
+        "Collector Wrong": raw["collector_wrong"].map(_to_num),
+        "Both Wrong": raw["both_wrong"].map(_to_num),
+        "completion_date": raw["completion_date"].str.strip(),
+    })
+    return {"df": _add_periods(df, "completion_date"), "fetched_at": datetime.now()}
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_sofa_output():
+    raw = _to_read("Sofa_Summary")
+    df = pd.DataFrame({
+        "Matches": raw["matches"].map(_to_num),
+        "Events Reviewed": raw["events_reviewed"].map(_to_num),
+        "SB Wrong": raw["sb_wrong"].map(_to_num),
+        "Both Wrong": raw["both_wrong"].map(_to_num),
+        "completion_date": raw["completion_date"].str.strip(),
+    })
+    return {"df": _add_periods(df, "completion_date"), "fetched_at": datetime.now()}
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_ws_output():
+    raw = _to_read("WS_Summary")
+    df = pd.DataFrame({
+        "Competition": raw["competition"].str.strip().replace("", "Unknown"),
+        "Event": raw["event"].str.strip().replace(_WS_EVENT_NAMES).replace("", "Unknown"),
+        "Events Reviewed": raw["events_reviewed"].map(_to_num),
+        "Missing": raw["missing"].map(_to_num),
+        "Already Added": raw["already_added"].map(_to_num),
+        "WS Wrong": raw["ws_wrong"].map(_to_num),
+        "completion_date": raw["completion_date"].str.strip(),
+    })
+    return {"df": _add_periods(df, "completion_date"), "fetched_at": datetime.now()}
+
+
+def _wk_label(ts):
+    return f"{ts.strftime('%b %d')} – {(ts + pd.Timedelta(days=6)).strftime('%b %d')}"
+
+
+def _mo_label(ts):
+    return ts.strftime("%b %Y")
+
+
+def _to_agg(df, by, metrics, match_col):
+    g = df.groupby(by)
+    out = g[metrics].sum()
+    if match_col:   # daily rows already hold the match count → sum it
+        out.insert(0, "Matches", g[match_col].sum())
+    return out.sort_index()
+
+
+def _to_cards(title, agg, sel, cols, base):
+    """One row of KPI cards for the selected period, with delta vs the previous one."""
+    st.markdown(f"##### {title}")
+    idx = list(agg.index)
+    row = agg.loc[sel]
+    prev = agg.loc[idx[idx.index(sel) - 1]] if idx.index(sel) > 0 else None
+    boxes = st.columns(len(cols))
+    for box, c in zip(boxes, cols):
+        val = int(row[c])
+        delta = None if prev is None else f"{val - int(prev[c]):+,}"
+        is_err = c not in ("Matches", base)
+        with box:
+            st.metric(c, f"{val:,}", delta=delta,
+                      delta_color="inverse" if is_err else "normal")
+            if is_err and row[base]:
+                st.caption(f"{val / row[base] * 100:.2f}% of reviewed")
+
+
+def _to_chart(agg, metrics, match_col, fmt, height=300):
+    a = agg.reset_index()
+    pcol = a.columns[0]
+    a["label"] = a[pcol].map(fmt)
+    order = list(a["label"])
+    long = a.melt(id_vars=["label"], value_vars=metrics, var_name="Metric", value_name="Count")
+    bars = alt.Chart(long).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+        x=alt.X("label:N", sort=order, title=None, axis=alt.Axis(labelAngle=0, labelLimit=160)),
+        xOffset=alt.XOffset("Metric:N", sort=metrics),
+        y=alt.Y("Count:Q", title="Events", axis=alt.Axis(format="d")),
+        color=alt.Color("Metric:N", scale=alt.Scale(domain=metrics, range=_CAT_COLORS[:len(metrics)]),
+                        legend=alt.Legend(title=None, orient="top")),
+        tooltip=[alt.Tooltip("label:N", title="Period"), "Metric",
+                 alt.Tooltip("Count:Q", format=",")])
+    chart = bars
+    if match_col:
+        line = alt.Chart(a).mark_line(point=True, color="#fafafa", strokeDash=[4, 3]).encode(
+            x=alt.X("label:N", sort=order),
+            y=alt.Y("Matches:Q", title="Matches (dashed)", axis=alt.Axis(format="d", orient="right")),
+            tooltip=[alt.Tooltip("label:N", title="Period"), alt.Tooltip("Matches:Q", format=",")])
+        chart = alt.layer(bars, line).resolve_scale(y="independent")
+    st.altair_chart(chart.properties(height=height), use_container_width=True)
+
+
+def _to_rates_table(agg, metrics, fmt):
+    base = metrics[0]
+    t = agg.copy()
+    for m in metrics[1:]:
+        t[f"{m} %"] = (t[m] / t[base].where(t[base] != 0) * 100).round(2)
+    t.index = [fmt(i) for i in t.index]
+    t = t.iloc[::-1]
+    st.dataframe(t, use_container_width=True)
+
+
+def _render_tool_output(df, key, metrics, match_col=None):
+    """Cards (week + month), weekly chart with week-range filter, monthly chart."""
+    if df.empty:
+        st.info("No reviewed data for this selection yet.")
+        return
+    cols = (["Matches"] if match_col else []) + metrics
+    wk = _to_agg(df, "week", metrics, match_col)
+    mo = _to_agg(df, "month", metrics, match_col)
+
+    c1, c2 = st.columns(2)
+    weeks_desc = list(wk.index)[::-1]
+    months_desc = list(mo.index)[::-1]
+    sel_w = c1.selectbox("Week (Sun – Sat)", weeks_desc, format_func=_wk_label, key=f"{key}_wsel")
+    sel_m = c2.selectbox("Month", months_desc, format_func=_mo_label, key=f"{key}_msel")
+
+    _to_cards(f"Week · {_wk_label(sel_w)}", wk, sel_w, cols, metrics[0])
+    _to_cards(f"Month · {_mo_label(sel_m)}", mo, sel_m, cols, metrics[0])
+    st.divider()
+
+    st.markdown("##### Weekly trend")
+    weeks = list(wk.index)
+    if len(weeks) > 1:
+        start_default = weeks[max(0, len(weeks) - _TO_WEEKS_DEFAULT)]
+        rng = st.select_slider("Weeks shown (default: last 6)", options=weeks,
+                               value=(start_default, weeks[-1]), format_func=_wk_label,
+                               key=f"{key}_wrange")
+        wk_view = wk.loc[rng[0]:rng[1]]
+    else:
+        wk_view = wk
+    _to_chart(wk_view, metrics, match_col, _wk_label)
+
+    st.markdown("##### Monthly trend")
+    _to_chart(mo, metrics, match_col, _mo_label)
+
+    with st.expander("Numbers & rates"):
+        st.markdown("**Weekly**")
+        _to_rates_table(wk, metrics, _wk_label)
+        st.markdown("**Monthly**")
+        _to_rates_table(mo, metrics, _mo_label)
+
+
+def _to_refresh(key, loader):
+    if st.button("🔄 Refresh", key=f"{key}_refresh"):
+        loader.clear()
+
+
+def _to_load(loader, label):
+    try:
+        return loader()
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"Couldn't read the **{label}** tab. Make sure the script has run and the sheet "
+                 "is shared with the service account's e-mail (Viewer).")
+        st.caption(f"Technical detail: {exc}")
+        return None
+
+
+@_auto_refresh
+def render_pr_output():
+    if not _to_configured():
+        st.info("Tools Output isn't connected yet. Add the service account and sheet IDs to "
+                "`.streamlit/secrets.toml` (see `apps_script/README.md`).")
+        return
+    _to_refresh("pr", load_pr_output)
+    data = _to_load(load_pr_output, "PR_Summary")
+    if data is None:
+        return
+    st.caption(f"Source: Player Review drive (Resolved folders) · week = collection completion date · "
+               f"updated {data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    _render_tool_output(data["df"], "pr", ["Events Reviewed", "Collector Wrong", "Both Wrong"],
+                        match_col="Matches")
+
+
+@_auto_refresh
+def render_sofa_output():
+    if not _to_configured():
+        st.info("Tools Output isn't connected yet. Add the service account and sheet IDs to "
+                "`.streamlit/secrets.toml` (see `apps_script/README.md`).")
+        return
+    _to_refresh("sofa", load_sofa_output)
+    data = _to_load(load_sofa_output, "Sofa_Summary")
+    if data is None:
+        return
+    st.caption(f"Source: resolved batches (Archive/Resolved + New Resolved) · week = "
+               f"collection completion date · updated {data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    _render_tool_output(data["df"], "sofa", ["Events Reviewed", "SB Wrong", "Both Wrong"],
+                        match_col="Matches")
+
+
+_WS_EVENT_NAMES = {"Pass": "through_ball", "TakeOn": "Dribble", "Take_On": "Dribble"}
+_WS_METRICS = ["Events Reviewed", "Missing", "Already Added", "WS Wrong"]
+
+
+def _ws_breakdown(df, dim, key):
+    """Table + stacked bar of a dimension (Event / Competition) for a chosen period."""
+    c1, c2 = st.columns([1, 2])
+    scope = c1.radio("Period", ["Week", "Month", "All time"], horizontal=True, key=f"{key}_scope")
+    sub = df
+    if scope == "Week":
+        opts = sorted(df["week"].unique(), reverse=True)
+        sel = c2.selectbox("Week", opts, format_func=lambda t: _wk_label(pd.Timestamp(t)),
+                           key=f"{key}_bw")
+        sub = df[df["week"] == sel]
+    elif scope == "Month":
+        opts = sorted(df["month"].unique(), reverse=True)
+        sel = c2.selectbox("Month", opts, format_func=lambda t: _mo_label(pd.Timestamp(t)),
+                           key=f"{key}_bm")
+        sub = df[df["month"] == sel]
+    t = sub.groupby(dim)[_WS_METRICS].sum().sort_values("Events Reviewed", ascending=False)
+    if t.empty:
+        st.info("Nothing reviewed in this period.")
+        return
+    long = t[_WS_METRICS[1:]].reset_index().melt(id_vars=[dim], var_name="Result", value_name="Events")
+    st.altair_chart(
+        alt.Chart(long).mark_bar().encode(
+            y=alt.Y(f"{dim}:N", sort=list(t.index), title=None, axis=alt.Axis(labelLimit=260)),
+            x=alt.X("Events:Q", stack="zero", axis=alt.Axis(format="d")),
+            color=alt.Color("Result:N", scale=alt.Scale(domain=_WS_METRICS[1:],
+                                                        range=_CAT_COLORS[1:4]),
+                            legend=alt.Legend(title=None, orient="top")),
+            tooltip=[dim, "Result", alt.Tooltip("Events:Q", format=",")])
+        .properties(height=max(180, 30 * len(t))),
+        use_container_width=True,
+    )
+    out = t.copy()
+    for m in _WS_METRICS[1:]:
+        out[f"{m} %"] = (out[m] / out["Events Reviewed"] * 100).round(2)
+    st.dataframe(out, use_container_width=True)
+
+
+@_auto_refresh
+def render_ws_output():
+    if not _to_configured():
+        st.info("Tools Output isn't connected yet. Add the service account and sheet IDs to "
+                "`.streamlit/secrets.toml` (see `apps_script/README.md`).")
+        return
+    _to_refresh("ws", load_ws_output)
+    data = _to_load(load_ws_output, "WS_Summary")
+    if data is None:
+        return
+    df = data["df"]
+    st.caption(f"Source: WhoScored sheet (Through-balls, reviewed rows) · week = "
+               f"collection completion date · updated {data['fetched_at'].strftime('%b %d, %I:%M %p')}")
+    t1, t2, t3 = st.tabs(["Overview", "By Event", "By Competition"])
+    with t1:
+        _render_tool_output(df, "ws_all", _WS_METRICS)
+    with t2:
+        ev = st.selectbox("Event", ["All events"] + sorted(df["Event"].unique()), key="ws_ev")
+        if ev == "All events":
+            _ws_breakdown(df, "Event", "ws_evb")
+        else:
+            _render_tool_output(df[df["Event"] == ev], f"ws_ev_{ev}", _WS_METRICS)
+    with t3:
+        comp = st.selectbox("Competition", ["All competitions"] + sorted(df["Competition"].unique()),
+                            key="ws_comp")
+        if comp == "All competitions":
+            _ws_breakdown(df, "Competition", "ws_cb")
+        else:
+            _render_tool_output(df[df["Competition"] == comp], f"ws_c_{comp}", _WS_METRICS)
+
+
 # ── Page Router ───────────────────────────────────────────────────────────────
 page = st.session_state.page
 
@@ -1616,3 +1958,19 @@ elif page == "Quality Score":
         "Dashboard in Google Sheets. Refreshes automatically every 5 minutes.",
     )
     render_quality_score()
+
+# ── Page: Tools Output (live dashboards for the review tools) ─────────────────
+elif page == "Tools Output":
+    render_page_header(
+        "Tools",
+        "Tools Output",
+        "Review output from the Player Review App, the Sofascore comparison tool and "
+        "WhoScored validation. Weeks run Sunday to Saturday. Refreshes every 5 minutes.",
+    )
+    _pr_tab, _sofa_tab, _ws_tab = st.tabs(["Player Review App", "Sofascore", "WhoScored Validation"])
+    with _pr_tab:
+        render_pr_output()
+    with _sofa_tab:
+        render_sofa_output()
+    with _ws_tab:
+        render_ws_output()
